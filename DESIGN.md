@@ -74,8 +74,13 @@ stok bisa dibaca sekilas tanpa harus membaca angka.
   1. **Header** berisi pemilih meja, kolom pencarian, navigasi, dan keranjang.
      Pemilih meja menggantikan "antar ke alamat" pada aplikasi pesan-antar,
      karena di kafe yang menentukan tujuan adalah nomor mejanya.
-  2. **Hero** dua kolom: teks dan pencarian di kiri, foto penuh di kanan.
-  3. **Baris kategori** berbentuk kartu bulat yang bisa digeser.
+  2. **Hero** dengan foto memenuhi seluruh blok, ditumpuk lapisan warna kertas
+     yang memudar dari kiri ke kanan. Teks tetap hitam di atas dasar terang,
+     jadi kontrasnya tidak bergantung pada isi foto yang sewaktu-waktu diganti.
+     Di dalamnya ada satu kotak berisi pemilih meja dan kolom pencarian.
+  3. **Baris kategori** berbentuk kartu bulat yang bisa digeser. Urutannya
+     ditentukan di `lib/kategori.ts`, bukan abjad: ini kafe kopi, jadi minuman
+     didahulukan, lalu sarapan, makanan berat, camilan, dan penutup.
   4. **Paling laku minggu ini**: tiga kartu, lalu satu panel hijau di kolom
      keempat. Panel itu menempati posisi yang biasanya diisi spanduk diskon,
      tapi isinya keadaan stok hari ini, bukan promo yang dikarang.

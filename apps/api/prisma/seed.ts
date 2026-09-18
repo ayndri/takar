@@ -57,6 +57,26 @@ const BAHAN = [
   { key: 'terigu', name: 'Tepung terigu', unit: 'G', min: 1500, beli: { name: 'kg', factor: 1000 }, harga: 14000 },
   { key: 'cokelatbatang', name: 'Cokelat batang', unit: 'G', min: 400, beli: { name: 'blok', factor: 500 }, harga: 78000 },
   { key: 'beras', name: 'Beras pulen', unit: 'G', min: 2500, beli: { name: 'kg', factor: 1000 }, harga: 16000 },
+  { key: 'mie', name: 'Mie telur', unit: 'G', min: 1000, beli: { name: 'pack', factor: 500 }, harga: 12000 },
+  { key: 'selada', name: 'Selada', unit: 'G', min: 300, beli: { name: 'kg', factor: 1000 }, harga: 25000 },
+  { key: 'tomat', name: 'Tomat', unit: 'G', min: 400, beli: { name: 'kg', factor: 1000 }, harga: 18000 },
+  { key: 'timun', name: 'Timun', unit: 'G', min: 300, beli: { name: 'kg', factor: 1000 }, harga: 12000 },
+  { key: 'sapi', name: 'Daging sapi giling', unit: 'G', min: 700, beli: { name: 'kg', factor: 1000 }, harga: 135000 },
+  { key: 'sosis', name: 'Sosis ayam', unit: 'PCS', min: 20, beli: { name: 'pack', factor: 10 }, harga: 32000 },
+  { key: 'udang', name: 'Udang kupas', unit: 'G', min: 500, beli: { name: 'kg', factor: 1000 }, harga: 110000 },
+  { key: 'jeruk', name: 'Jeruk peras', unit: 'PCS', min: 24, beli: { name: 'kg', factor: 8 }, harga: 28000 },
+  { key: 'mangga', name: 'Mangga harum manis', unit: 'G', min: 500, beli: { name: 'kg', factor: 1000 }, harga: 35000 },
+  { key: 'pisang', name: 'Pisang', unit: 'PCS', min: 20, beli: { name: 'sisir', factor: 12 }, harga: 24000 },
+  { key: 'stroberi', name: 'Stroberi', unit: 'G', min: 300, beli: { name: 'pack', factor: 250 }, harga: 45000 },
+  { key: 'yoghurt', name: 'Yoghurt plain', unit: 'ML', min: 800, beli: { name: 'botol', factor: 1000 }, harga: 42000 },
+  { key: 'madu', name: 'Madu', unit: 'ML', min: 250, beli: { name: 'botol', factor: 500 }, harga: 68000 },
+  { key: 'sambal', name: 'Saus sambal', unit: 'ML', min: 400, beli: { name: 'botol', factor: 500 }, harga: 22000 },
+  { key: 'kecap', name: 'Kecap manis', unit: 'ML', min: 400, beli: { name: 'botol', factor: 600 }, harga: 24000 },
+  { key: 'minyak', name: 'Minyak goreng', unit: 'ML', min: 1000, beli: { name: 'liter', factor: 1000 }, harga: 21000 },
+  { key: 'bawang', name: 'Bawang putih', unit: 'G', min: 300, beli: { name: 'kg', factor: 1000 }, harga: 38000 },
+  { key: 'santan', name: 'Santan kental', unit: 'ML', min: 600, beli: { name: 'kotak', factor: 500 }, harga: 12000 },
+  { key: 'burger', name: 'Roti burger', unit: 'PCS', min: 12, beli: { name: 'pack', factor: 6 }, harga: 22000 },
+  { key: 'tortilla', name: 'Kulit tortilla', unit: 'PCS', min: 12, beli: { name: 'pack', factor: 10 }, harga: 28000 },
 ] as const
 
 type BahanKey = (typeof BAHAN)[number]['key']
@@ -91,23 +111,58 @@ const MENU: MenuSeed[] = [
   { name: 'Susu Kurma', category: 'Non-kopi', price: 20000, foto: 'photo-1572442388796-11668a67e53d', laris: 3, recipe: { susu: 200, gula: 20, cup16: 1, es: 100 } },
   { name: 'Teh Lemon Dingin', category: 'Non-kopi', price: 18000, foto: 'photo-1499636136210-6f4ee915583e', laris: 4, recipe: { teh: 8, gula: 25, cup16: 1, es: 150 } },
 
+  // Jus & Smoothie
+  { name: 'Jus Jeruk Peras', category: 'Jus & Smoothie', price: 20000, foto: 'photo-1621506289937-a8e4df240d0b', laris: 7, recipe: { jeruk: 4, es: 100, cup16: 1 } },
+  { name: 'Jus Mangga', category: 'Jus & Smoothie', price: 22000, foto: 'photo-1546173159-315724a31696', laris: 6, recipe: { mangga: 200, es: 100, cup16: 1 } },
+  { name: 'Smoothie Stroberi', category: 'Jus & Smoothie', price: 26000, foto: 'photo-1553530666-ba11a7da3888', laris: 5, recipe: { stroberi: 120, yoghurt: 120, madu: 15, cup16: 1 } },
+  { name: 'Smoothie Pisang Madu', category: 'Jus & Smoothie', price: 24000, foto: 'photo-1502741224143-90386d7f8c82', laris: 4, recipe: { pisang: 2, susu: 150, madu: 15, cup16: 1 } },
+  { name: 'Yoghurt Buah', category: 'Jus & Smoothie', price: 23000, foto: 'photo-1488477181946-6428a0291777', laris: 4, recipe: { yoghurt: 180, stroberi: 60, madu: 10, cup16: 1 } },
+
   // Sarapan
   { name: 'Roti Bakar Alpukat', category: 'Sarapan', price: 32000, foto: 'photo-1588137378633-dea1336ce1e2', laris: 6, recipe: { roti: 2, alpukat: 1, mentega: 10 } },
   { name: 'Telur Orak-arik Keju', category: 'Sarapan', price: 28000, foto: 'photo-1482049016688-2d3e1b311543', laris: 5, recipe: { telur: 3, keju: 40, mentega: 10 } },
   { name: 'Roti Bakar Cokelat', category: 'Sarapan', price: 24000, foto: 'photo-1587314168485-3236d6710814', laris: 4, recipe: { roti: 2, cokelatbatang: 30, mentega: 10 } },
   { name: 'Omelet Ayam', category: 'Sarapan', price: 35000, foto: 'photo-1510693206972-df098062cb71', laris: 3, recipe: { telur: 3, ayam: 80, keju: 30, mentega: 10 } },
+  { name: 'Sosis Telur Panggang', category: 'Sarapan', price: 30000, foto: 'photo-1626074353765-517a681e40be', laris: 4, recipe: { sosis: 2, telur: 2, mentega: 10 } },
 
-  // Makanan
-  { name: 'Nasi Ayam Panggang', category: 'Makanan', price: 42000, foto: 'photo-1546069901-ba9599a7e63c', laris: 7, recipe: { beras: 150, ayam: 150, mentega: 10 } },
-  { name: 'Kentang Goreng', category: 'Makanan', price: 25000, foto: 'photo-1573080496219-bb080dd4f877', laris: 8, recipe: { kentang: 200 } },
-  { name: 'Sandwich Ayam', category: 'Makanan', price: 38000, foto: 'photo-1568901346375-23c9450c58cd', laris: 6, recipe: { roti: 2, ayam: 120, keju: 30, mentega: 10 } },
-  { name: 'Nasi Telur Sambal', category: 'Makanan', price: 28000, foto: 'photo-1512058564366-18510be2db19', laris: 5, recipe: { beras: 150, telur: 2, mentega: 8 } },
+  // Nasi
+  { name: 'Nasi Ayam Panggang', category: 'Nasi', price: 42000, foto: 'photo-1546069901-ba9599a7e63c', laris: 8, recipe: { beras: 150, ayam: 150, mentega: 10 } },
+  { name: 'Nasi Telur Sambal', category: 'Nasi', price: 28000, foto: 'photo-1512058564366-18510be2db19', laris: 6, recipe: { beras: 150, telur: 2, sambal: 20, minyak: 10 } },
+  { name: 'Nasi Goreng Kampung', category: 'Nasi', price: 35000, foto: 'photo-1603133872878-684f208fb84b', laris: 9, recipe: { beras: 150, telur: 1, bawang: 10, kecap: 15, minyak: 15 } },
+  { name: 'Nasi Ayam Sambal Matah', category: 'Nasi', price: 45000, foto: 'photo-1565299507177-b0ac66763828', laris: 6, recipe: { beras: 150, ayam: 120, sambal: 25, minyak: 12 } },
+  { name: 'Nasi Udang Saus Padang', category: 'Nasi', price: 52000, foto: 'photo-1626700051175-6818013e1d4f', laris: 4, recipe: { beras: 150, udang: 120, sambal: 30, santan: 40 } },
+
+  // Mie
+  { name: 'Mie Goreng Spesial', category: 'Mie', price: 33000, foto: 'photo-1552611052-33e04de081de', laris: 8, recipe: { mie: 150, telur: 1, bawang: 10, kecap: 15, minyak: 15 } },
+  { name: 'Mie Ayam Bawang', category: 'Mie', price: 32000, foto: 'photo-1569718212165-3a8278d5f624', laris: 7, recipe: { mie: 150, ayam: 80, bawang: 10, minyak: 10 } },
+  { name: 'Mie Kuah Udang', category: 'Mie', price: 38000, foto: 'photo-1623428187969-5da2dcea5ebf', laris: 5, recipe: { mie: 150, udang: 80, santan: 50, bawang: 8 } },
+  { name: 'Mie Tumis Sayur', category: 'Mie', price: 28000, foto: 'photo-1585032226651-759b368d7246', laris: 4, recipe: { mie: 150, selada: 40, tomat: 40, minyak: 12 } },
+
+  // Roti & Burger
+  { name: 'Sandwich Ayam', category: 'Roti & Burger', price: 38000, foto: 'photo-1568901346375-23c9450c58cd', laris: 7, recipe: { roti: 2, ayam: 120, keju: 30, mentega: 10 } },
+  { name: 'Burger Sapi Klasik', category: 'Roti & Burger', price: 45000, foto: 'photo-1568901346375-23c9450c58cd', laris: 9, recipe: { burger: 1, sapi: 120, keju: 20, selada: 20, tomat: 25 } },
+  { name: 'Burger Ayam Krispi', category: 'Roti & Burger', price: 42000, foto: 'photo-1550547660-d9450f859349', laris: 7, recipe: { burger: 1, ayam: 110, selada: 20, sambal: 15 } },
+  { name: 'Tortilla Ayam', category: 'Roti & Burger', price: 36000, foto: 'photo-1565299507177-b0ac66763828', laris: 5, recipe: { tortilla: 2, ayam: 100, selada: 25, tomat: 25 } },
+  { name: 'Roti Panggang Keju', category: 'Roti & Burger', price: 26000, foto: 'photo-1528735602780-2552fd46c7af', laris: 4, recipe: { roti: 2, keju: 45, mentega: 12 } },
+
+  // Camilan
+  { name: 'Kentang Goreng', category: 'Camilan', price: 25000, foto: 'photo-1573080496219-bb080dd4f877', laris: 10, recipe: { kentang: 200, minyak: 20 } },
+  { name: 'Kentang Keju', category: 'Camilan', price: 30000, foto: 'photo-1630384060421-cb20d0e0649d', laris: 6, recipe: { kentang: 200, keju: 40, minyak: 20 } },
+  { name: 'Sosis Bakar Saus', category: 'Camilan', price: 24000, foto: 'photo-1607013251379-e6eecfffe234', laris: 5, recipe: { sosis: 3, sambal: 20 } },
+  { name: 'Udang Goreng Tepung', category: 'Camilan', price: 38000, foto: 'photo-1626700051175-6818013e1d4f', laris: 4, recipe: { udang: 100, terigu: 40, minyak: 30 } },
+  { name: 'Pisang Goreng Madu', category: 'Camilan', price: 22000, foto: 'photo-1587132137056-bfbf0166836e', laris: 6, recipe: { pisang: 3, terigu: 40, minyak: 25, madu: 10 } },
+
+  // Salad
+  { name: 'Salad Sayur Segar', category: 'Salad', price: 28000, foto: 'photo-1512621776951-a57141f2eefd', laris: 4, recipe: { selada: 80, tomat: 60, timun: 60 } },
+  { name: 'Salad Ayam Panggang', category: 'Salad', price: 38000, foto: 'photo-1546793665-c74683f339c1', laris: 5, recipe: { selada: 70, ayam: 100, tomat: 50, timun: 40 } },
+  { name: 'Salad Buah Yoghurt', category: 'Salad', price: 26000, foto: 'photo-1490474418585-ba9bad8fd0ea', laris: 3, recipe: { mangga: 80, stroberi: 60, pisang: 1, yoghurt: 100 } },
 
   // Manis
   { name: 'Brownies Cokelat', category: 'Manis', price: 22000, foto: 'photo-1606313564200-e75d5e30476c', laris: 6, recipe: { cokelatbatang: 40, terigu: 50, telur: 1, mentega: 30 } },
   { name: 'Kue Keju', category: 'Manis', price: 26000, foto: 'photo-1524351199678-941a58a3df50', laris: 5, recipe: { keju: 60, terigu: 40, telur: 1, mentega: 20 } },
   { name: 'Croissant Mentega', category: 'Manis', price: 20000, foto: 'photo-1555507036-ab1f4038808a', laris: 7, recipe: { terigu: 60, mentega: 40 } },
-  { name: 'Cookie Cokelat', category: 'Manis', price: 15000, foto: 'photo-1499636136210-6f4ee915583e', laris: 4, recipe: { terigu: 40, cokelatbatang: 25, mentega: 20, telur: 1 } },
+  { name: 'Cookie Cokelat', category: 'Manis', price: 15000, foto: 'photo-1499636136210-6f4ee915583e', laris: 5, recipe: { terigu: 40, cokelatbatang: 25, mentega: 20, telur: 1 } },
+  { name: 'Pisang Cokelat', category: 'Manis', price: 20000, foto: 'photo-1587132137056-bfbf0166836e', laris: 4, recipe: { pisang: 2, cokelatbatang: 25, mentega: 10 } },
 ]
 
 const ALASAN_WASTE = ['SPILLED', 'EXPIRED', 'MISTAKE'] as const
@@ -321,6 +376,13 @@ async function main() {
       { key: 'alpukat', qty: 3 }, { key: 'keju', qty: 1.5 }, { key: 'mentega', qty: 3 },
       { key: 'kentang', qty: 5 }, { key: 'ayam', qty: 5 }, { key: 'terigu', qty: 4 },
       { key: 'cokelatbatang', qty: 2 }, { key: 'beras', qty: 6 },
+      { key: 'mie', qty: 8 }, { key: 'selada', qty: 2 }, { key: 'tomat', qty: 2 },
+      { key: 'timun', qty: 1.5 }, { key: 'sapi', qty: 3 }, { key: 'sosis', qty: 6 },
+      { key: 'udang', qty: 2 }, { key: 'jeruk', qty: 6 }, { key: 'mangga', qty: 3 },
+      { key: 'pisang', qty: 5 }, { key: 'stroberi', qty: 4 }, { key: 'yoghurt', qty: 3 },
+      { key: 'madu', qty: 2 }, { key: 'sambal', qty: 3 }, { key: 'kecap', qty: 2 },
+      { key: 'minyak', qty: 6 }, { key: 'bawang', qty: 1.5 }, { key: 'santan', qty: 4 },
+      { key: 'burger', qty: 8 }, { key: 'tortilla', qty: 4 },
     ],
     'Grosir Bahan Sejahtera',
   )
@@ -345,6 +407,10 @@ async function main() {
           { key: 'roti', qty: 3 }, { key: 'telur', qty: 2 }, { key: 'alpukat', qty: 1 },
           { key: 'ayam', qty: 2 }, { key: 'kentang', qty: 2 }, { key: 'beras', qty: 3 },
           { key: 'mentega', qty: 1 }, { key: 'keju', qty: 0.5 }, { key: 'terigu', qty: 1 },
+          { key: 'mie', qty: 3 }, { key: 'selada', qty: 1 }, { key: 'tomat', qty: 1 },
+          { key: 'sapi', qty: 1 }, { key: 'sosis', qty: 3 }, { key: 'udang', qty: 1 },
+          { key: 'jeruk', qty: 3 }, { key: 'pisang', qty: 3 }, { key: 'burger', qty: 4 },
+          { key: 'minyak', qty: 2 }, { key: 'bawang', qty: 0.5 },
         ],
         pilih(['Grosir Bahan Sejahtera', 'Toko Susu Pagi', 'Pasar Kopi Nusantara']),
       )

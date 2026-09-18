@@ -8,23 +8,30 @@ import {
   IconQR,
   IconTakar,
 } from "@/components/icons";
+import { HeroSearch } from "@/components/hero-search";
 import { MenuCard } from "@/components/menu-card";
 import { PilihanUtama } from "@/components/pilihan-utama";
 import { Takaran } from "@/components/takaran";
 import { formatRupiah, getPublicMenus, type PublicMenu } from "@/lib/api";
+import { urutkanKategori } from "@/lib/kategori";
 
 // Beranda memuat sisa porsi yang berubah tiap pesanan masuk.
 export const dynamic = "force-dynamic";
 
 const FOTO_HERO =
-  "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=1200&q=75";
+  "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1600&q=75";
 
 /** Satu foto mewakili tiap kategori di baris pemilih. */
 const FOTO_KATEGORI: Record<string, string> = {
   Kopi: "photo-1541167760496-1628856ab772",
   "Non-kopi": "photo-1515823064-d6e0c04616a7",
+  "Jus & Smoothie": "photo-1621506289937-a8e4df240d0b",
   Sarapan: "photo-1588137378633-dea1336ce1e2",
-  Makanan: "photo-1546069901-ba9599a7e63c",
+  Nasi: "photo-1603133872878-684f208fb84b",
+  Mie: "photo-1552611052-33e04de081de",
+  "Roti & Burger": "photo-1568901346375-23c9450c58cd",
+  Camilan: "photo-1573080496219-bb080dd4f877",
+  Salad: "photo-1512621776951-a57141f2eefd",
   Manis: "photo-1606313564200-e75d5e30476c",
 };
 
@@ -68,7 +75,9 @@ export default async function BerandaPage() {
 
   const tersedia = menus.filter((m) => m.available);
 
-  const kategori = [...new Set(menus.map((m) => m.category))].map((nama) => ({
+  const kategori = urutkanKategori([
+    ...new Set(menus.map((m) => m.category)),
+  ]).map((nama) => ({
     nama,
     jumlah: menus.filter((m) => m.category === nama).length,
     foto: FOTO_KATEGORI[nama],
@@ -86,75 +95,64 @@ export default async function BerandaPage() {
     <main>
       {/* ── hero ── */}
       <section className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
-        <div className="overflow-hidden rounded-3xl bg-surface">
-          <div className="grid lg:grid-cols-[1.05fr_1fr]">
-            <div className="p-6 sm:p-10">
-              <h1 className="font-display text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl">
-                Kopi enak,
-                <br />
-                takarannya pas.
-              </h1>
+        <div className="relative overflow-hidden rounded-3xl">
+          <Image
+            src={FOTO_HERO}
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 1280px) 100vw, 1152px"
+            className="object-cover object-right"
+          />
 
-              <p className="mt-4 max-w-md text-muted">
-                Pilih dari {menus.length} menu yang diracik setelah kamu pesan.
-                Yang tampil di daftar cuma yang bahannya benar-benar ada.
-              </p>
+          {/* Lapisan kertas dari kiri: teks tetap hitam di atas dasar terang,
+              jadi kontrasnya tidak bergantung pada isi fotonya. */}
+          <div className="absolute inset-0 bg-linear-to-r from-paper from-30% via-paper/95 via-55% to-paper/20" />
 
-              <form
-                action="/menu"
-                role="search"
-                className="mt-6 flex max-w-md gap-2"
+          <div className="relative max-w-xl px-6 py-10 sm:px-10 sm:py-14 lg:py-20">
+            <p className="inline-flex rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent-ink">
+              Pesan sendiri dari meja
+            </p>
+
+            <h1 className="mt-4 font-display text-4xl leading-[1.03] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+              Makan enak,
+              <br />
+              takarannya pas.
+            </h1>
+
+            <p className="mt-4 max-w-md text-muted">
+              {menus.length} menu, dari kopi sampai nasi goreng, diracik setelah
+              kamu pesan. Yang tampil di daftar cuma yang bahannya benar-benar
+              ada di dapur.
+            </p>
+
+            <div className="mt-6">
+              <HeroSearch />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
+              <Link
+                href="/menu"
+                className="rounded-xl bg-accent px-5 py-3 font-medium text-white hover:bg-accent-ink"
               >
-                <input
-                  type="search"
-                  name="q"
-                  placeholder="Cari kopi, roti, atau yang manis"
-                  aria-label="Cari menu"
-                  className="min-w-0 flex-1 rounded-xl border border-border bg-paper px-4 py-3 text-sm"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-accent px-5 py-3 text-sm font-medium text-white hover:bg-accent-ink"
-                >
-                  Cari
-                </button>
-              </form>
-
-              <div className="mt-5 flex flex-wrap gap-3 text-sm">
-                <Link
-                  href="/menu"
-                  className="rounded-xl bg-accent px-5 py-3 font-medium text-white hover:bg-accent-ink"
-                >
-                  Lihat menu hari ini
-                </Link>
-                <Link
-                  href="/pesanan"
-                  className="rounded-xl border border-border px-5 py-3 font-medium hover:border-accent"
-                >
-                  Lacak pesanan
-                </Link>
-              </div>
-
-              {!gagal && (
-                <p className="mt-6 text-sm text-muted">
-                  <span className="font-medium text-ink">
-                    {tersedia.length} dari {menus.length}
-                  </span>{" "}
-                  menu bisa dibuat sekarang
-                </p>
-              )}
+                Lihat menu hari ini
+              </Link>
+              <Link
+                href="/pesanan"
+                className="rounded-xl border border-border bg-surface px-5 py-3 font-medium hover:border-accent"
+              >
+                Lacak pesanan
+              </Link>
             </div>
 
-            <div className="relative min-h-56 lg:min-h-full">
-              <Image
-                src={FOTO_HERO}
-                alt="Barista menuang susu ke dalam cangkir kopi"
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 560px"
-                className="object-cover"
-              />
-            </div>
+            {!gagal && (
+              <p className="mt-6 text-sm text-muted">
+                <span className="font-medium text-ink">
+                  {tersedia.length} dari {menus.length}
+                </span>{" "}
+                menu bisa dibuat sekarang
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -182,26 +180,28 @@ export default async function BerandaPage() {
         <>
           {/* ── kategori ── */}
           <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
-            <ul className="flex gap-3 overflow-x-auto pb-2">
-              <li>
+            <h2 className="sr-only">Kategori menu</h2>
+
+            <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+              <li className="shrink-0">
                 <Link
                   href="/menu"
-                  className="flex w-24 flex-col items-center gap-2 rounded-2xl border-2 border-accent bg-accent-soft px-2 py-3 text-center"
+                  className="flex w-[84px] flex-col items-center gap-2 rounded-2xl border-2 border-accent bg-accent-soft px-2 py-3 text-center"
                 >
                   <span className="grid size-11 place-items-center rounded-full bg-surface font-display text-sm font-semibold text-accent-ink">
                     {menus.length}
                   </span>
-                  <span className="text-xs font-medium text-accent-ink">
+                  <span className="text-xs leading-tight font-medium text-accent-ink">
                     Semua
                   </span>
                 </Link>
               </li>
 
               {kategori.map((k) => (
-                <li key={k.nama}>
+                <li key={k.nama} className="shrink-0">
                   <Link
                     href={`/menu?kategori=${encodeURIComponent(k.nama)}`}
-                    className="flex w-24 flex-col items-center gap-2 rounded-2xl border-2 border-transparent bg-surface px-2 py-3 text-center hover:border-accent"
+                    className="flex w-[84px] flex-col items-center gap-2 rounded-2xl border-2 border-transparent bg-surface px-2 py-3 text-center hover:border-accent"
                   >
                     <span className="relative size-11 overflow-hidden rounded-full bg-sunk">
                       {k.foto && (
@@ -214,10 +214,10 @@ export default async function BerandaPage() {
                         />
                       )}
                     </span>
-                    <span className="text-xs font-medium">{k.nama}</span>
-                    <span className="text-[11px] text-muted">
-                      {k.jumlah} menu
+                    <span className="text-xs leading-tight font-medium">
+                      {k.nama}
                     </span>
+                    <span className="text-[11px] text-muted">{k.jumlah}</span>
                   </Link>
                 </li>
               ))}

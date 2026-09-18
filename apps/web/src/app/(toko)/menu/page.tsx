@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MenuCard } from "@/components/menu-card";
 import { getPublicMenus, type PublicMenu } from "@/lib/api";
+import { urutkanKategori } from "@/lib/kategori";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,9 @@ export default async function KatalogPage({
     gagal = true;
   }
 
-  const kategoriTersedia = [...new Set(menus.map((m) => m.category))];
+  const kategoriTersedia = urutkanKategori([
+    ...new Set(menus.map((m) => m.category)),
+  ]);
 
   const kata = q.trim().toLowerCase();
   const hasil = menus.filter((m) => {
