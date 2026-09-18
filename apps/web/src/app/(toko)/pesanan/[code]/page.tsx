@@ -12,8 +12,8 @@ export default async function OrderPage({
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-10 sm:px-6">
-      <Link href="/" className="text-sm text-muted">
-        ← Kembali ke menu
+      <Link href="/menu" className="text-sm text-muted hover:text-ink">
+        Kembali ke menu
       </Link>
 
       <OrderStatus code={code} />

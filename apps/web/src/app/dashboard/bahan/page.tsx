@@ -133,7 +133,7 @@ export default function BahanPage() {
             <>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="font-medium">
-                  Kartu stok — {card.data.ingredient.name}
+                  Kartu stok: {card.data.ingredient.name}
                 </h2>
                 <p className="text-xs text-muted">
                   cache {card.data.currentQty} · ledger {card.data.ledgerQty}

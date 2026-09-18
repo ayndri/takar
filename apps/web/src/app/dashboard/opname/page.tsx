@@ -83,7 +83,7 @@ export default function OpnamePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Stock opname</h1>
         <p className="mt-1 text-sm text-muted">
-          Isi hasil hitung fisik. Angka sistem tidak ditimpa — selisihnya
+          Isi hasil hitung fisik. Angka sistem tidak ditimpa, selisihnya
           dicatat sebagai penyesuaian di kartu stok.
         </p>
       </div>
@@ -126,8 +126,8 @@ export default function OpnamePage() {
                             [item.id]: e.target.value,
                           }))
                         }
-                        placeholder="—"
-                        className="w-28 rounded-lg border border-border bg-background px-2 py-1 text-right"
+                        placeholder="·"
+                        className="w-28 rounded-lg border border-border bg-paper px-2 py-1 text-right"
                       />
                     </td>
                     <td
@@ -142,7 +142,7 @@ export default function OpnamePage() {
                       }`}
                     >
                       {selisih === null
-                        ? "—"
+                        ? "·"
                         : `${selisih > 0 ? "+" : ""}${selisih}`}
                     </td>
                   </tr>
@@ -156,7 +156,7 @@ export default function OpnamePage() {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Catatan opname (opsional)"
-          className="mt-4 w-full max-w-md rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="mt-4 w-full max-w-md rounded-lg border border-border bg-paper px-3 py-2 text-sm"
         />
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
@@ -164,7 +164,7 @@ export default function OpnamePage() {
         <button
           type="submit"
           disabled={saving}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 font-medium text-background disabled:opacity-50"
+          className="mt-4 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
         >
           {saving ? "Menyimpan…" : "Simpan opname"}
         </button>

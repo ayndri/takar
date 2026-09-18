@@ -114,7 +114,7 @@ export default function PembelianPage() {
             onChange={(e) => setSupplier(e.target.value)}
             required
             placeholder="Contoh: Toko Bahan Jaya"
-            className="mt-1 w-full max-w-sm rounded-lg border border-border bg-background px-3 py-2"
+            className="mt-1 w-full max-w-sm rounded-lg border border-border bg-paper px-3 py-2"
           />
         </label>
 
@@ -135,7 +135,7 @@ export default function PembelianPage() {
                       purchaseUnitId: "",
                     })
                   }
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
                 >
                   <option value="">Pilih bahan…</option>
                   {ingredients.map((i) => (
@@ -151,7 +151,7 @@ export default function PembelianPage() {
                     ubahBaris(index, { purchaseUnitId: e.target.value })
                   }
                   disabled={!bahan}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm disabled:opacity-50"
                 >
                   <option value="">
                     {bahan ? bahan.baseUnit.toLowerCase() : "satuan"}
@@ -170,7 +170,7 @@ export default function PembelianPage() {
                   value={row.qty}
                   onChange={(e) => ubahBaris(index, { qty: e.target.value })}
                   placeholder="Jumlah"
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
                 />
 
                 <input
@@ -182,7 +182,7 @@ export default function PembelianPage() {
                     ubahBaris(index, { unitPrice: e.target.value })
                   }
                   placeholder="Harga/satuan"
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
                 />
 
                 <button
@@ -216,7 +216,7 @@ export default function PembelianPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-accent px-4 py-2 font-medium text-background disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
           >
             {saving ? "Menyimpan…" : "Simpan nota"}
           </button>
@@ -245,7 +245,7 @@ export default function PembelianPage() {
               {p.items.map((item) => (
                 <li key={item.id} className="flex justify-between gap-3">
                   <span>
-                    {item.ingredient.name} — {item.qty}{" "}
+                    {item.ingredient.name}: {item.qty}{" "}
                     {item.purchaseUnit?.name ??
                       item.ingredient.baseUnit.toLowerCase()}
                     <span className="text-muted">

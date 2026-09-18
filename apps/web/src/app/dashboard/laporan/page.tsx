@@ -121,7 +121,7 @@ export default function LaporanPage() {
           )}
         </Panel>
 
-        <Panel judul="Margin per menu — yang paling tipis di atas">
+        <Panel judul="Margin per menu, yang paling tipis di atas">
           <ul className="space-y-2 text-sm">
             {margins.map((m) => (
               <li key={m.menuId} className="flex justify-between gap-3">

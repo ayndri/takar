@@ -79,7 +79,7 @@ export default function DashboardLayout({
                     href={item.href}
                     className={`inline-block rounded-t-lg px-3 py-2 text-sm whitespace-nowrap ${
                       active
-                        ? "border-b-2 border-accent font-medium text-foreground"
+                        ? "border-b-2 border-accent font-medium text-ink"
                         : "text-muted"
                     }`}
                   >

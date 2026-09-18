@@ -90,6 +90,12 @@ export async function listMenusForOwner() {
   })
 }
 
+/**
+ * Detail menu untuk halaman pelanggan.
+ *
+ * Nama bahan ditampilkan (berguna untuk yang menghindari susu), tapi TAKARANNYA
+ * tidak: resep itu isi dapur, dan endpoint ini terbuka tanpa login.
+ */
 export async function getMenu(id: string) {
   const menu = await prisma.menu.findUnique({
     where: { id },
@@ -120,12 +126,7 @@ export async function getMenu(id: string) {
     imageUrl: menu.imageUrl,
     isActive: menu.isActive,
     remainingPortions: maxPortions(recipe, stock),
-    recipes: menu.recipes.map((r) => ({
-      ingredientId: r.ingredientId,
-      name: r.ingredient.name,
-      baseUnit: r.ingredient.baseUnit,
-      qty: r.qty.toString(),
-    })),
+    ingredients: menu.recipes.map((r) => r.ingredient.name),
   }
 }
 

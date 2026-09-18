@@ -131,7 +131,7 @@ export default function PesananPage() {
       {shortage && (
         <div className="mb-4 rounded-lg border border-border bg-surface p-4">
           <p className="font-medium text-danger">
-            Pesanan {shortage.code} tidak bisa dikonfirmasi — bahan kurang
+            Pesanan {shortage.code} tidak bisa dikonfirmasi, bahan kurang
           </p>
           <ul className="mt-2 space-y-1 text-sm text-muted">
             {shortage.items.map((s) => (
@@ -216,7 +216,7 @@ export default function PesananPage() {
                           type="button"
                           onClick={() => void konfirmasi(order)}
                           disabled={busy === order.id}
-                          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
+                          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                         >
                           {busy === order.id ? "…" : "Konfirmasi"}
                         </button>

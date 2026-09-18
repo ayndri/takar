@@ -22,30 +22,53 @@ const INGREDIENTS = [
   { key: 'es', name: 'Es batu', baseUnit: 'G', minStock: 2000, unit: { name: 'balok', factor: 5000 } },
 ] as const
 
+// Foto sementara dari Unsplash sampai kafe punya foto sendiri.
+// Disimpan di kolom imageUrl supaya nanti cukup diganti lewat data,
+// tanpa menyentuh kode tampilan.
+const FOTO = (id: string) => `https://images.unsplash.com/${id}?w=800&q=70`
+
 const MENUS = [
   {
     name: 'Latte',
     category: 'Kopi',
     price: 25000,
+    imageUrl: FOTO('photo-1541167760496-1628856ab772'),
     recipe: { kopi: 18, susu: 150, cup: 1 },
   },
   {
     name: 'Es Kopi Susu',
     category: 'Kopi',
     price: 22000,
+    imageUrl: FOTO('photo-1461023058943-07fcbe16d735'),
     recipe: { kopi: 20, susu: 100, gula: 30, cup: 1, es: 120 },
   },
   {
     name: 'Americano',
     category: 'Kopi',
     price: 18000,
+    imageUrl: FOTO('photo-1509042239860-f550ce710b93'),
     recipe: { kopi: 20, cup: 1 },
   },
   {
     name: 'Susu Kurma',
     category: 'Non-kopi',
     price: 20000,
+    imageUrl: FOTO('photo-1572442388796-11668a67e53d'),
     recipe: { susu: 200, gula: 20, cup: 1, es: 100 },
+  },
+  {
+    name: 'Cokelat Panas',
+    category: 'Non-kopi',
+    price: 21000,
+    imageUrl: FOTO('photo-1447933601403-0c6688de566e'),
+    recipe: { susu: 220, gula: 25, cup: 1 },
+  },
+  {
+    name: 'Teh Tarik',
+    category: 'Non-kopi',
+    price: 17000,
+    imageUrl: FOTO('photo-1495474472287-4d71bcdd2085'),
+    recipe: { susu: 150, gula: 20, cup: 1, es: 80 },
   },
 ] as const
 
@@ -131,6 +154,7 @@ async function main() {
         name: menu.name,
         category: menu.category,
         price: menu.price,
+        imageUrl: menu.imageUrl,
         recipes: {
           create: Object.entries(menu.recipe).map(([key, qty]) => ({
             ingredientId: ingredientIds.get(key)!,

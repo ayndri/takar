@@ -77,14 +77,14 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-background disabled:opacity-50"
+          className="w-full rounded-lg bg-accent px-4 py-2.5 font-medium text-white disabled:opacity-50"
         >
           {loading ? "Memeriksa…" : "Masuk"}
         </button>
       </form>
 
       <div className="mt-8 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-        <p className="font-medium text-foreground">Akun contoh</p>
+        <p className="font-medium text-ink">Akun contoh</p>
         <p className="mt-1 font-mono text-xs">owner@takar.test / takar1234</p>
         <p className="font-mono text-xs">staff@takar.test / takar1234</p>
       </div>

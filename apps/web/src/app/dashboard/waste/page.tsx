@@ -77,7 +77,7 @@ export default function WastePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Waste</h1>
         <p className="mt-1 text-sm text-muted">
-          Bahan yang terbuang dicatat terpisah dari penjualan — ini yang
+          Bahan yang terbuang dicatat terpisah dari penjualan. Ini yang
           menjawab ke mana uangnya bocor.
         </p>
       </div>
@@ -90,7 +90,7 @@ export default function WastePage() {
           value={ingredientId}
           onChange={(e) => setIngredientId(e.target.value)}
           required
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
         >
           <option value="">Pilih bahan…</option>
           {ingredients.map((i) => (
@@ -108,13 +108,13 @@ export default function WastePage() {
           onChange={(e) => setQty(e.target.value)}
           required
           placeholder={bahanTerpilih?.baseUnit.toLowerCase() ?? "jumlah"}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
         />
 
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
         >
           {ALASAN.map((a) => (
             <option key={a.value} value={a.value}>
@@ -127,13 +127,13 @@ export default function WastePage() {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Catatan (opsional)"
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
         />
 
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {saving ? "…" : "Catat"}
         </button>
