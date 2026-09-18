@@ -95,7 +95,7 @@ export default async function BerandaPage() {
     <main>
       {/* ── hero ── */}
       <section className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
-        <div className="relative overflow-hidden rounded-3xl">
+        <div className="relative overflow-hidden rounded-3xl border border-border">
           <Image
             src={FOTO_HERO}
             alt=""
@@ -109,7 +109,7 @@ export default async function BerandaPage() {
               jadi kontrasnya tidak bergantung pada isi fotonya. */}
           <div className="absolute inset-0 bg-linear-to-r from-paper from-30% via-paper/95 via-55% to-paper/20" />
 
-          <div className="relative max-w-xl px-6 py-10 sm:px-10 sm:py-14 lg:py-20">
+          <div className="relative max-w-xl px-6 py-10 sm:px-10 sm:py-16 lg:py-24">
             <p className="inline-flex rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent-ink">
               Pesan sendiri dari meja
             </p>
@@ -182,16 +182,18 @@ export default async function BerandaPage() {
           <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
             <h2 className="sr-only">Kategori menu</h2>
 
-            <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+            {/* Tinggi kartu dikunci dan labelnya dibatasi dua baris, supaya
+                "Jus & Smoothie" tidak membuat barisnya ikut naik turun. */}
+            <ul className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2">
               <li className="shrink-0">
                 <Link
                   href="/menu"
-                  className="flex w-[84px] flex-col items-center gap-2 rounded-2xl border-2 border-accent bg-accent-soft px-2 py-3 text-center"
+                  className="flex h-[112px] w-[92px] flex-col items-center gap-2 rounded-2xl border border-accent bg-accent-soft px-2 pt-3 text-center"
                 >
-                  <span className="grid size-11 place-items-center rounded-full bg-surface font-display text-sm font-semibold text-accent-ink">
+                  <span className="grid size-12 shrink-0 place-items-center rounded-full bg-surface font-display text-base font-semibold text-accent-ink">
                     {menus.length}
                   </span>
-                  <span className="text-xs leading-tight font-medium text-accent-ink">
+                  <span className="text-xs leading-snug font-medium text-accent-ink">
                     Semua
                   </span>
                 </Link>
@@ -201,23 +203,22 @@ export default async function BerandaPage() {
                 <li key={k.nama} className="shrink-0">
                   <Link
                     href={`/menu?kategori=${encodeURIComponent(k.nama)}`}
-                    className="flex w-[84px] flex-col items-center gap-2 rounded-2xl border-2 border-transparent bg-surface px-2 py-3 text-center hover:border-accent"
+                    className="flex h-[112px] w-[92px] flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-2 pt-3 text-center transition hover:border-accent"
                   >
-                    <span className="relative size-11 overflow-hidden rounded-full bg-sunk">
+                    <span className="relative size-12 shrink-0 overflow-hidden rounded-full bg-sunk">
                       {k.foto && (
                         <Image
-                          src={`https://images.unsplash.com/${k.foto}?w=120&q=70`}
+                          src={`https://images.unsplash.com/${k.foto}?w=140&q=70`}
                           alt=""
                           fill
-                          sizes="44px"
+                          sizes="48px"
                           className="object-cover"
                         />
                       )}
                     </span>
-                    <span className="text-xs leading-tight font-medium">
+                    <span className="line-clamp-2 text-xs leading-snug font-medium text-balance">
                       {k.nama}
                     </span>
-                    <span className="text-[11px] text-muted">{k.jumlah}</span>
                   </Link>
                 </li>
               ))}
@@ -306,7 +307,7 @@ export default async function BerandaPage() {
           {unggulan && (
             <section className="mx-auto max-w-6xl px-4 pt-10 sm:px-6">
               <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]">
-                <article className="overflow-hidden rounded-3xl bg-surface">
+                <article className="overflow-hidden rounded-3xl border border-border bg-surface">
                   <div className="relative aspect-4/3">
                     {unggulan.imageUrl && (
                       <Image

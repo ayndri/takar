@@ -29,24 +29,38 @@ yang hanya satu di antaranya benar-benar dipakai.
 
 | Token | Nilai | Dipakai untuk |
 |---|---|---|
-| `paper` | `#FAF6F1` | latar halaman, kertas hangat, bukan putih steril |
-| `surface` | `#FFFFFF` | kartu dan panel yang perlu naik selapis dari kertas |
-| `sunk` | `#F3ECE4` | kolom kosong, tempat foto sebelum termuat |
-| `ink` | `#241C17` | seluruh teks utama |
-| `muted` | `#6F6259` | keterangan, kontras 5,5:1 di atas kertas |
-| `accent` | `#B8472A` | satu-satunya aksen, warna biji kopi sangrai |
-| `accent-ink` | `#8F331C` | teks di atas `accent-soft`, dan hover tombol |
-| `forest` | `#2C5347` | dipakai persis sekali, di panel penjelasan stok |
+| `paper` | `#FFFFFF` | latar halaman |
+| `surface` | `#FFFFFF` | kartu dan panel |
+| `sunk` | `#F4F4F5` | kolom kosong, tempat foto sebelum termuat |
+| `border` | `#E8E6E3` | pembatas kartu |
+| `ink` | `#1C1917` | seluruh teks utama |
+| `muted` | `#6B6560` | keterangan, kontras 5,7:1 di atas putih |
+| `accent` | `#C63E23` | satu-satunya aksen, merah bata |
+| `accent-ink` | `#9C2F19` | teks di atas `accent-soft`, dan hover tombol |
+| `forest` | `#23554A` | dipakai persis sekali, di panel penjelasan stok |
 | `warning` | `#8A5313` | penanda stok menipis |
 | `danger` | `#A1231B` | kesalahan dan selisih negatif di dasbor |
+
+Latar dan kartu sama-sama putih, jadi yang memisahkan keduanya adalah garis
+tipis, bukan bayangan. Bayangan disimpan untuk elemen yang memang mengambang
+di atas halaman, seperti bar keranjang. Kalau semua kartu diberi bayangan,
+halaman jadi terasa melayang dan tidak ada yang menonjol.
 
 Aksen hanya satu, dan dipakai hemat: tombol utama, penanda halaman aktif, dan
 garis takaran. Warna kedua (`forest`) sengaja muncul di satu tempat saja supaya
 panel itu terbaca sebagai penjelasan, bukan sebagai bagian menu.
 
 Semua pasangan teks dan latar sudah dicek terhadap WCAG AA: `muted` di atas
-kertas 5,5:1; putih di atas `accent` 5,3:1; `accent-ink` di atas `accent-soft`
-6,7:1; `warning` di atas putih 6,3:1; teks panel di atas `forest` 6,3:1.
+putih 5,7:1; putih di atas `accent` 5,1:1; `accent-ink` di atas `accent-soft`
+6,6:1; `warning` di atas putih 6,3:1; teks panel di atas `forest` 8,6:1.
+
+## Kartu kategori
+
+Tingginya dikunci di 112px dan labelnya dibatasi dua baris. Tanpa itu, nama
+panjang seperti "Jus & Smoothie" membuat kartunya lebih tinggi dari tetangganya
+dan barisnya terlihat bergelombang. Jumlah menu per kategori sengaja tidak
+ditulis di kartu: angka itu sudah muncul di halaman katalog, dan di sini cuma
+menambah baris ketiga yang bikin susunannya ramai.
 
 ## Huruf
 

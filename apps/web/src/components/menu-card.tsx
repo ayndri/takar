@@ -31,7 +31,7 @@ export function MenuCard({
   const menipis = menu.available && menu.remainingPortions <= AMBANG_MENIPIS;
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl bg-surface">
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-surface transition hover:border-accent/40">
       <Link
         href={`/menu/${menu.id}`}
         className="block"

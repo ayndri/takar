@@ -2,28 +2,28 @@
 
 /*
   Tema terang saja, tanpa toggle gelap.
-  Alasannya: aplikasi ini dibuka pelanggan di meja kafe yang terang, dan
-  identitas Takar bertumpu pada warna kertas hangat yang hilang di mode gelap.
+  Alasannya: aplikasi ini dibuka pelanggan di meja kafe yang terang, dan foto
+  makanan terbaca paling jujur di atas latar putih.
 */
 
 :root {
-  /* Netral: kertas hangat, bukan putih steril. */
-  --paper: #faf6f1;
+  /* Netral: putih bersih, dengan satu tingkat abu untuk kolom kosong. */
+  --paper: #ffffff;
   --surface: #ffffff;
-  --surface-sunk: #f3ece4;
-  --border: #e6dcd1;
-  --ink: #241c17;
-  --muted: #6f6259;
+  --surface-sunk: #f4f4f5;
+  --border: #e8e6e3;
+  --ink: #1c1917;
+  --muted: #6b6560;
 
-  /* Aksen tunggal: terracotta, diambil dari warna biji kopi sangrai. */
-  --accent: #b8472a;
-  --accent-ink: #8f331c;
-  --accent-soft: #f8e9e2;
+  /* Aksen tunggal: merah bata. Cukup gelap untuk menopang teks putih (5,1:1). */
+  --accent: #c63e23;
+  --accent-ink: #9c2f19;
+  --accent-soft: #fdeee9;
 
   /* Warna kedua, dipakai hanya untuk panel penjelasan stok. */
-  --forest: #2c5347;
+  --forest: #23554a;
 
-  /* Peringatan stok menipis. Kontras 4.6:1 di atas kertas. */
+  /* Peringatan stok menipis. */
   --warning: #8a5313;
 
   /* Kesalahan dan selisih negatif di dasbor. */
@@ -58,6 +58,16 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/*
+  Di latar putih, kartu butuh pembatas sendiri. Yang dipakai garis tipis,
+  bukan bayangan di mana-mana: bayangan disimpan untuk elemen yang memang
+  mengambang di atas halaman, seperti bar keranjang.
+*/
+.kartu {
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 /*
