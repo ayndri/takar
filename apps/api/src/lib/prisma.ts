@@ -1,0 +1,12 @@
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
+import { env } from '../config/env.js'
+
+// Runtime pakai connection string pooled. Migrasi pakai DIRECT_URL,
+// diatur terpisah di prisma.config.ts.
+const adapter = new PrismaPg({ connectionString: env.DATABASE_URL })
+
+export const prisma = new PrismaClient({
+  adapter,
+  log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+})

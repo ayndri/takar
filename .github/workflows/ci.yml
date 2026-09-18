@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: API — typecheck & test
+    runs-on: ubuntu-latest
+
+    env:
+      # Nilai boneka: job ini tidak menyentuh database sungguhan.
+      # Prisma CLI tetap butuh connection string untuk memuat prisma.config.ts.
+      DATABASE_URL: postgresql://takar:takar@localhost:5432/takar
+      DIRECT_URL: postgresql://takar:takar@localhost:5432/takar
+      JWT_SECRET: rahasia-ci-yang-panjangnya-lebih-dari-32-karakter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate --workspace=apps/api
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p apps/api/tsconfig.json
+
+      - name: Test
+        run: npm run test --workspace=apps/api
+
+  web:
+    name: Web — lint & build
+    runs-on: ubuntu-latest
+
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint --workspace=apps/web
+
+      - name: Build
+        run: npm run build --workspace=apps/web

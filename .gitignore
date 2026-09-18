@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# nestjs
+dist/
+
+# env — JANGAN PERNAH di-commit
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# testing
+coverage/
+
+# editor & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# log
+*.log
+npm-debug.log*
+
+# ── catatan kerja internal — tidak ikut ke GitHub ──
+CLAUDE.md
+AGENTS.md
+.claude/
+ROADMAP.md
+catatan/
+*.local.md

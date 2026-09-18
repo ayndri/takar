@@ -1,0 +1,347 @@
+// Takar — skema database
+//
+// Aturan yang dipegang di seluruh skema ini:
+//  1. Stok TIDAK disimpan sebagai satu kolom angka. Sumber kebenarannya adalah
+//     StockMovement (append-only). IngredientStock cuma cache yang selalu ditulis
+//     di dalam transaksi yang sama dengan movement-nya.
+//  2. Semua qty & uang pakai Decimal, bukan Float. 18 g x 3 harus tepat.
+//  3. Qty di StockMovement selalu dalam satuan dasar bahan (baseUnit).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: connection string tidak lagi ditulis di sini.
+// CLI (migrate/studio) membacanya dari prisma.config.ts,
+// runtime memakai driver adapter di src/lib/prisma.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────── enum ───────────────────────────
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum BaseUnit {
+  G
+  ML
+  PCS
+}
+
+enum MovementType {
+  PURCHASE // + nota pembelian supplier
+  SALE // − pesanan dikonfirmasi (lewat resep)
+  WASTE // − tumpah / basi / salah bikin
+  ADJUSTMENT // ± selisih hasil stock opname
+  RETURN // + pesanan dibatalkan / retur ke supplier
+  TRANSFER_IN // + pindah antar outlet (v2)
+  TRANSFER_OUT // − pindah antar outlet (v2)
+}
+
+enum OrderStatus {
+  PENDING // pelanggan sudah kirim, kasir belum konfirmasi
+  CONFIRMED // ← stok dipotong di titik ini
+  PREPARING
+  READY
+  DONE
+  CANCELLED // ← stok dikembalikan lewat movement RETURN
+}
+
+enum WasteReason {
+  SPILLED
+  EXPIRED
+  MISTAKE
+  OTHER
+}
+
+// ─────────────────────────── master ───────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  wasteLogs WasteLog[]
+  opnames   StockOpname[]
+
+  @@map("users")
+}
+
+model Ingredient {
+  id       String   @id @default(uuid())
+  name     String   @unique
+  baseUnit BaseUnit @map("base_unit")
+
+  /// Ambang peringatan "stok menipis", dalam satuan dasar.
+  minStock Decimal @default(0) @map("min_stock") @db.Decimal(14, 3)
+
+  /// Harga rata-rata tertimbang per satuan dasar. Dihitung ulang tiap pembelian
+  /// dan jadi dasar HPP per menu.
+  avgCost Decimal @default(0) @map("avg_cost") @db.Decimal(14, 4)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  purchaseUnits PurchaseUnit[]
+  recipes       Recipe[]
+  movements     StockMovement[]
+  stock         IngredientStock?
+  purchaseItems PurchaseItem[]
+  wasteLogs     WasteLog[]
+  opnameItems   OpnameItem[]
+
+  @@map("ingredients")
+}
+
+/// Satuan beli → faktor konversi ke satuan dasar.
+/// Contoh: susu baseUnit = ML, satuan beli "karton" factor = 12000.
+model PurchaseUnit {
+  id           String     @id @default(uuid())
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  name   String
+  factor Decimal @db.Decimal(14, 4)
+
+  purchaseItems PurchaseItem[]
+
+  @@unique([ingredientId, name])
+  @@map("purchase_units")
+}
+
+/// Cache hasil SUM(stock_movements.qty). Selalu ditulis di dalam transaksi
+/// yang sama dengan movement-nya, dan bisa dihitung ulang kapan saja.
+model IngredientStock {
+  ingredientId String     @id @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  qty       Decimal  @default(0) @db.Decimal(14, 3)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ingredient_stocks")
+}
+
+model Menu {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  category String
+  price    Decimal @db.Decimal(14, 2)
+  imageUrl String? @map("image_url")
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  recipes    Recipe[]
+  orderItems OrderItem[]
+
+  @@map("menus")
+}
+
+/// Resep: berapa banyak tiap bahan dipakai untuk SATU porsi menu.
+/// qty selalu dalam satuan dasar bahan.
+model Recipe {
+  id String @id @default(uuid())
+
+  menuId String @map("menu_id")
+  menu   Menu   @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  qty Decimal @db.Decimal(14, 3)
+
+  @@unique([menuId, ingredientId])
+  @@map("recipes")
+}
+
+model CafeTable {
+  id       String  @id @default(uuid())
+  number   String  @unique
+  qrToken  String  @unique @map("qr_token")
+  isActive Boolean @default(true) @map("is_active")
+
+  orders Order[]
+
+  @@map("tables")
+}
+
+// ─────────────────────────── transaksi ───────────────────────────
+
+model Order {
+  id   String @id @default(uuid())
+  /// Kode pendek yang dipakai pelanggan untuk melihat status pesanan.
+  code String @unique
+
+  tableId String?    @map("table_id")
+  table   CafeTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  customerName String?     @map("customer_name")
+  status       OrderStatus @default(PENDING)
+  total        Decimal     @db.Decimal(14, 2)
+  note         String?
+
+  /// Diisi saat status masuk CONFIRMED — penanda stok sudah dipotong.
+  confirmedAt DateTime? @map("confirmed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items OrderItem[]
+
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  menuId String @map("menu_id")
+  menu   Menu   @relation(fields: [menuId], references: [id], onDelete: Restrict)
+
+  qty Int
+
+  /// Harga disalin saat pesanan dibuat — harga menu boleh berubah nanti
+  /// tanpa mengubah nilai pesanan lama.
+  unitPrice Decimal @map("unit_price") @db.Decimal(14, 2)
+  note      String?
+
+  @@map("order_items")
+}
+
+model Purchase {
+  id       String   @id @default(uuid())
+  supplier String
+  date     DateTime @default(now())
+  total    Decimal  @db.Decimal(14, 2)
+  note     String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  items PurchaseItem[]
+
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id String @id @default(uuid())
+
+  purchaseId String   @map("purchase_id")
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  purchaseUnitId String?       @map("purchase_unit_id")
+  purchaseUnit   PurchaseUnit? @relation(fields: [purchaseUnitId], references: [id], onDelete: SetNull)
+
+  /// Jumlah dalam satuan beli (mis. 2 karton).
+  qty Decimal @db.Decimal(14, 3)
+
+  /// Harga per satuan beli (mis. Rp 180.000 per karton).
+  unitPrice Decimal @map("unit_price") @db.Decimal(14, 2)
+
+  /// Hasil konversi ke satuan dasar — disimpan supaya laporan tidak perlu
+  /// menghitung ulang faktor yang mungkin sudah berubah.
+  baseQty Decimal @map("base_qty") @db.Decimal(14, 3)
+
+  @@map("purchase_items")
+}
+
+model WasteLog {
+  id String @id @default(uuid())
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  /// Selalu positif di sini; movement-nya yang bernilai negatif.
+  qty    Decimal     @db.Decimal(14, 3)
+  reason WasteReason
+  note   String?
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("waste_logs")
+}
+
+model StockOpname {
+  id   String   @id @default(uuid())
+  date DateTime @default(now())
+  note String?
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  items OpnameItem[]
+
+  @@map("stock_opnames")
+}
+
+model OpnameItem {
+  id String @id @default(uuid())
+
+  opnameId String      @map("opname_id")
+  opname   StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  /// Angka menurut sistem saat opname dilakukan.
+  systemQty Decimal @map("system_qty") @db.Decimal(14, 3)
+
+  /// Angka hasil hitung fisik.
+  physicalQty Decimal @map("physical_qty") @db.Decimal(14, 3)
+
+  /// physicalQty − systemQty. Inilah yang jadi movement ADJUSTMENT.
+  diff Decimal @db.Decimal(14, 3)
+
+  @@unique([opnameId, ingredientId])
+  @@map("opname_items")
+}
+
+// ─────────────────────────── inti: ledger ───────────────────────────
+
+/// Append-only. Tidak pernah di-UPDATE, tidak pernah di-DELETE.
+/// Pembatalan diwujudkan sebagai baris baru yang berlawanan tanda.
+model StockMovement {
+  id String @id @default(uuid())
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  /// Positif = masuk, negatif = keluar. Dalam satuan dasar bahan.
+  qty  Decimal      @db.Decimal(14, 3)
+  type MovementType
+
+  /// Penunjuk ke dokumen sumber: "order" | "purchase" | "waste" | "opname".
+  refType String? @map("ref_type")
+  refId   String? @map("ref_id")
+
+  /// Harga per satuan dasar saat pergerakan terjadi — dipakai menghitung
+  /// nilai persediaan dan HPP historis.
+  unitCost Decimal? @map("unit_cost") @db.Decimal(14, 4)
+
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ingredientId, createdAt])
+  @@index([refType, refId])
+  @@map("stock_movements")
+}
