@@ -13,7 +13,7 @@ import { HeroSearch } from "@/components/hero-search";
 import { MenuCard } from "@/components/menu-card";
 import { PilihanUtama } from "@/components/pilihan-utama";
 import { Takaran } from "@/components/takaran";
-import { formatRupiah, getPublicMenus, type PublicMenu } from "@/lib/api";
+import { formatRupiah, getHighlights, type Highlights } from "@/lib/api";
 import { urutkanKategori } from "@/lib/kategori";
 
 // Beranda memuat sisa porsi yang berubah tiap pesanan masuk.
@@ -65,35 +65,44 @@ const JANJI = [
 ];
 
 export default async function BerandaPage() {
-  let menus: PublicMenu[] = [];
+  // Beranda hanya butuh ringkasan, bukan seluruh katalog: membuka halaman
+  // depan tidak seharusnya berarti mengunduh sembilan puluh enam menu.
+  let data: Highlights | null = null;
   let gagal = false;
 
   try {
-    menus = await getPublicMenus();
+    data = await getHighlights();
   } catch {
     gagal = true;
   }
 
-  const tersedia = menus.filter((m) => m.available);
+  const stats = data?.stats ?? {
+    total: 0,
+    available: 0,
+    categories: 0,
+    soldThisWeek: 0,
+  };
 
-  const kategori = urutkanKategori([
-    ...new Set(menus.map((m) => m.category)),
-  ]).map((nama) => ({
+  const jumlahPerKategori = new Map(
+    (data?.categories ?? []).map((c) => [c.name, c.count]),
+  );
+
+  const kategori = urutkanKategori(
+    (data?.categories ?? []).map((c) => c.name),
+  ).map((nama) => ({
     nama,
-    jumlah: menus.filter((m) => m.category === nama).length,
+    jumlah: jumlahPerKategori.get(nama) ?? 0,
     foto: FOTO_KATEGORI[nama],
   }));
 
-  const terlaris = [...tersedia].sort((a, b) => b.soldThisWeek - a.soldThisWeek);
+  const terlaris = data?.topSellers ?? [];
 
   /** Yang nomor satu naik ke kartu hero; sisanya mengisi bagian di bawahnya. */
   const unggulan = terlaris[0];
   const populer = terlaris.slice(1, 4);
   const sorotan = terlaris[4];
   const pilihanLain = terlaris.slice(5, 11);
-  const menipis = tersedia
-    .filter((m) => m.remainingPortions <= 5)
-    .sort((a, b) => a.remainingPortions - b.remainingPortions);
+  const menipis = data?.lowStock ?? [];
 
   return (
     <main>
@@ -117,7 +126,7 @@ export default async function BerandaPage() {
             </h1>
 
             <p className="mt-5 max-w-md text-lg text-muted">
-              {menus.length} menu, dari kopi sampai nasi goreng, diracik setelah
+              {stats.total} menu, dari kopi sampai nasi goreng, diracik setelah
               kamu pesan. Yang tampil di daftar cuma yang bahannya benar-benar
               ada di dapur.
             </p>
@@ -146,8 +155,8 @@ export default async function BerandaPage() {
                 <div>
                   <dt className="text-sm text-muted">Bisa dibuat sekarang</dt>
                   <dd className="font-display text-2xl font-semibold">
-                    {tersedia.length}
-                    <span className="text-muted"> / {menus.length} menu</span>
+                    {stats.available}
+                    <span className="text-muted"> / {stats.total} menu</span>
                   </dd>
                 </div>
                 <div>
@@ -159,7 +168,7 @@ export default async function BerandaPage() {
                 <div>
                   <dt className="text-sm text-muted">Terjual minggu ini</dt>
                   <dd className="font-display text-2xl font-semibold">
-                    {menus.reduce((s, m) => s + m.soldThisWeek, 0)} porsi
+                    {stats.soldThisWeek} porsi
                   </dd>
                 </div>
               </dl>
@@ -197,7 +206,7 @@ export default async function BerandaPage() {
             </p>
           </div>
         </section>
-      ) : menus.length === 0 ? (
+      ) : stats.total === 0 ? (
         <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <div className="rounded-2xl border border-dashed border-border p-8 text-center">
             <p className="font-display text-xl">Menu belum disusun</p>
@@ -225,7 +234,7 @@ export default async function BerandaPage() {
                   className="flex h-[116px] w-full flex-col items-center gap-2 rounded-2xl border border-accent bg-accent-soft px-1.5 pt-3 text-center"
                 >
                   <span className="grid size-12 shrink-0 place-items-center rounded-full bg-surface font-display text-base font-semibold text-accent-ink">
-                    {menus.length}
+                    {stats.total}
                   </span>
                   <span className="text-xs leading-snug font-medium text-accent-ink">
                     Semua

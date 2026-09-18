@@ -59,7 +59,43 @@ export type PublicMenu = {
   ingredientCount: number
 }
 
-export const getPublicMenus = () => api<PublicMenu[]>('/api/menus')
+export type Paginated<T> = {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+  pages: number
+}
+
+export const getPublicMenus = (params: {
+  q?: string
+  category?: string
+  page?: number
+  pageSize?: number
+} = {}) => {
+  const p = new URLSearchParams()
+  if (params.q) p.set('q', params.q)
+  if (params.category) p.set('category', params.category)
+  if (params.page) p.set('page', String(params.page))
+  if (params.pageSize) p.set('pageSize', String(params.pageSize))
+
+  const s = p.toString()
+  return api<Paginated<PublicMenu>>(`/api/menus${s ? `?${s}` : ''}`)
+}
+
+export type Highlights = {
+  stats: {
+    total: number
+    available: number
+    categories: number
+    soldThisWeek: number
+  }
+  categories: { name: string; count: number }[]
+  topSellers: PublicMenu[]
+  lowStock: PublicMenu[]
+}
+
+export const getHighlights = () => api<Highlights>('/api/menus/highlights')
 
 export const formatRupiah = (value: string | number) =>
   new Intl.NumberFormat('id-ID', {

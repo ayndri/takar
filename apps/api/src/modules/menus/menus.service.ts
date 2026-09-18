@@ -10,14 +10,51 @@ import { getAvgCostMap, getStockMap } from '../stock/stock.service.js'
  * Ketersediaan dihitung sekali untuk semua menu, bukan per menu — satu query
  * stok, bukan satu query per kartu menu.
  */
-export async function listPublicMenus() {
+export type ListMenuParams = {
+  q?: string
+  category?: string
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * Katalog untuk halaman pelanggan.
+ *
+ * Penyaringan dan pemotongan halaman dilakukan di sini, bukan di browser:
+ * dengan hampir seratus menu, mengirim semuanya lalu membuang sebagian besar
+ * di layar itu pemborosan yang akan terasa di koneksi ponsel.
+ *
+ * Ketersediaan tetap dihitung sekali untuk halaman yang diminta, dengan satu
+ * query stok, bukan satu query per kartu menu.
+ */
+export async function listPublicMenus(params: ListMenuParams = {}) {
   const semingguLalu = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const page = Math.max(1, params.page ?? 1)
+  const pageSize = Math.min(96, Math.max(1, params.pageSize ?? 12))
+
+  const where = {
+    isActive: true,
+    ...(params.category && { category: params.category }),
+    ...(params.q && {
+      OR: [
+        { name: { contains: params.q, mode: 'insensitive' as const } },
+        { category: { contains: params.q, mode: 'insensitive' as const } },
+      ],
+    }),
+  }
+
+  const total = await prisma.menu.count({ where })
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const halaman = Math.min(page, pages)
 
   const [menus, stock, terjual] = await Promise.all([
     prisma.menu.findMany({
-      where: { isActive: true },
+      where,
       include: { recipes: { select: { ingredientId: true, qty: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      skip: (halaman - 1) * pageSize,
+      take: pageSize,
     }),
     getStockMap(),
     // Dipakai untuk menandai menu terlaris. Hanya pesanan yang benar-benar
@@ -39,7 +76,7 @@ export async function listPublicMenus() {
     terjual.map((row) => [row.menuId, row._sum.qty ?? 0]),
   )
 
-  return menus.map((menu) => {
+  const items = menus.map((menu) => {
     const recipe: RecipeLine[] = menu.recipes.map((r) => ({
       ingredientId: r.ingredientId,
       qty: r.qty.toString(),
@@ -60,6 +97,87 @@ export async function listPublicMenus() {
       ingredientCount: menu.recipes.length,
     }
   })
+
+  return { items, total, page: halaman, pageSize, pages }
+}
+
+/**
+ * Ringkasan untuk beranda.
+ *
+ * Beranda tidak perlu seluruh katalog: yang dibutuhkan hanya daftar kategori
+ * beserta jumlahnya, menu terlaris, dan yang stoknya menipis. Dipisah supaya
+ * membuka beranda tidak berarti mengunduh sembilan puluh enam menu.
+ */
+export async function getHighlights() {
+  const semingguLalu = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const [menus, stock, terjual, perKategori] = await Promise.all([
+    prisma.menu.findMany({
+      where: { isActive: true },
+      include: { recipes: { select: { ingredientId: true, qty: true } } },
+    }),
+    getStockMap(),
+    prisma.orderItem.groupBy({
+      by: ['menuId'],
+      _sum: { qty: true },
+      where: {
+        order: {
+          status: { in: ['CONFIRMED', 'PREPARING', 'READY', 'DONE'] },
+          confirmedAt: { gte: semingguLalu },
+        },
+      },
+    }),
+    prisma.menu.groupBy({
+      by: ['category'],
+      _count: { _all: true },
+      where: { isActive: true },
+    }),
+  ])
+
+  const terjualPerMenu = new Map(
+    terjual.map((row) => [row.menuId, row._sum.qty ?? 0]),
+  )
+
+  const lengkap = menus.map((menu) => {
+    const recipe: RecipeLine[] = menu.recipes.map((r) => ({
+      ingredientId: r.ingredientId,
+      qty: r.qty.toString(),
+    }))
+    const portions = maxPortions(recipe, stock)
+
+    return {
+      id: menu.id,
+      name: menu.name,
+      category: menu.category,
+      price: menu.price.toString(),
+      imageUrl: menu.imageUrl,
+      available: portions > 0,
+      remainingPortions: portions,
+      soldThisWeek: terjualPerMenu.get(menu.id) ?? 0,
+      ingredientCount: menu.recipes.length,
+    }
+  })
+
+  const tersedia = lengkap.filter((m) => m.available)
+
+  return {
+    stats: {
+      total: lengkap.length,
+      available: tersedia.length,
+      categories: perKategori.length,
+      soldThisWeek: [...terjualPerMenu.values()].reduce((a, b) => a + b, 0),
+    },
+    categories: perKategori
+      .map((c) => ({ name: c.category, count: c._count._all }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'id')),
+    topSellers: [...tersedia]
+      .sort((a, b) => b.soldThisWeek - a.soldThisWeek)
+      .slice(0, 12),
+    lowStock: tersedia
+      .filter((m) => m.remainingPortions <= 5)
+      .sort((a, b) => a.remainingPortions - b.remainingPortions)
+      .slice(0, 5),
+  }
 }
 
 /** Versi untuk dashboard: ikut membawa HPP dan margin. */

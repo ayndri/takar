@@ -1,60 +1,86 @@
 import Link from "next/link";
 import { MejaTerpilih } from "@/components/meja-terpilih";
 import { MenuCard } from "@/components/menu-card";
-import { getPublicMenus, type PublicMenu } from "@/lib/api";
+import { Pagination } from "@/components/pagination";
+import {
+  getHighlights,
+  getPublicMenus,
+  type Highlights,
+  type Paginated,
+  type PublicMenu,
+} from "@/lib/api";
 import { urutkanKategori } from "@/lib/kategori";
 
 export const dynamic = "force-dynamic";
 
+const PER_HALAMAN = 12;
+
 export default async function KatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; kategori?: string }>;
+  searchParams: Promise<{ q?: string; kategori?: string; hal?: string }>;
 }) {
-  const { q = "", kategori = "" } = await searchParams;
+  const { q = "", kategori = "", hal = "1" } = await searchParams;
+  const halaman = Math.max(1, Number(hal) || 1);
 
-  let menus: PublicMenu[] = [];
+  let hasil: Paginated<PublicMenu> | null = null;
+  let ringkasan: Highlights | null = null;
   let gagal = false;
 
   try {
-    menus = await getPublicMenus();
+    [hasil, ringkasan] = await Promise.all([
+      getPublicMenus({
+        q: q.trim() || undefined,
+        category: kategori || undefined,
+        page: halaman,
+        pageSize: PER_HALAMAN,
+      }),
+      getHighlights(),
+    ]);
   } catch {
     gagal = true;
   }
 
-  const kategoriTersedia = urutkanKategori([
-    ...new Set(menus.map((m) => m.category)),
-  ]);
+  const kategoriTersedia = urutkanKategori(
+    (ringkasan?.categories ?? []).map((c) => c.name),
+  );
 
-  const kata = q.trim().toLowerCase();
-  const hasil = menus.filter((m) => {
-    const cocokKategori = !kategori || m.category === kategori;
-    const cocokKata =
-      !kata ||
-      m.name.toLowerCase().includes(kata) ||
-      m.category.toLowerCase().includes(kata);
-    return cocokKategori && cocokKata;
-  });
+  const jumlahPerKategori = new Map(
+    (ringkasan?.categories ?? []).map((c) => [c.name, c.count]),
+  );
 
-  const buatTautan = (patch: { q?: string; kategori?: string }) => {
+  const buatTautan = (patch: {
+    q?: string;
+    kategori?: string;
+    hal?: number;
+  }) => {
     const p = new URLSearchParams();
     const nextQ = patch.q ?? q;
     const nextKategori = patch.kategori ?? kategori;
+    const nextHal = patch.hal ?? 1;
+
     if (nextQ) p.set("q", nextQ);
     if (nextKategori) p.set("kategori", nextKategori);
+    if (nextHal > 1) p.set("hal", String(nextHal));
+
     const s = p.toString();
     return s ? `/menu?${s}` : "/menu";
   };
 
+  const awal = hasil ? (hasil.page - 1) * hasil.pageSize + 1 : 0;
+  const akhir = hasil ? Math.min(hasil.page * hasil.pageSize, hasil.total) : 0;
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-        Menu hari ini
+        {kategori || "Menu hari ini"}
       </h1>
       <p className="mt-2 text-muted">
         {gagal
           ? "Daftar menu sedang tidak bisa dimuat."
-          : `${menus.filter((m) => m.available).length} dari ${menus.length} menu bisa dibuat sekarang.`}
+          : ringkasan
+            ? `${ringkasan.stats.available} dari ${ringkasan.stats.total} menu bisa dibuat sekarang.`
+            : ""}
       </p>
 
       <MejaTerpilih />
@@ -82,7 +108,7 @@ export default async function KatalogPage({
           <ul className="flex flex-wrap gap-2">
             <li>
               <Link
-                href={buatTautan({ kategori: "" })}
+                href={buatTautan({ kategori: "", hal: 1 })}
                 aria-current={kategori === "" ? "true" : undefined}
                 className={`inline-block rounded-xl border px-3 py-1.5 text-sm ${
                   kategori === ""
@@ -96,7 +122,7 @@ export default async function KatalogPage({
             {kategoriTersedia.map((k) => (
               <li key={k}>
                 <Link
-                  href={buatTautan({ kategori: k })}
+                  href={buatTautan({ kategori: k, hal: 1 })}
                   aria-current={kategori === k ? "true" : undefined}
                   className={`inline-block rounded-xl border px-3 py-1.5 text-sm ${
                     kategori === k
@@ -105,6 +131,9 @@ export default async function KatalogPage({
                   }`}
                 >
                   {k}
+                  <span className="ml-1.5 text-xs opacity-70">
+                    {jumlahPerKategori.get(k)}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -120,11 +149,11 @@ export default async function KatalogPage({
             halaman, atau pesan langsung ke kasir.
           </p>
         </div>
-      ) : hasil.length === 0 ? (
+      ) : !hasil || hasil.items.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center">
           <p className="font-display text-xl">Tidak ada yang cocok</p>
           <p className="mt-1 text-sm text-muted">
-            {kata
+            {q.trim()
               ? `Tidak ada menu bernama "${q}".`
               : "Kategori ini belum punya menu."}
           </p>
@@ -136,11 +165,23 @@ export default async function KatalogPage({
           </Link>
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {hasil.map((menu) => (
-            <MenuCard key={menu.id} menu={menu} />
-          ))}
-        </div>
+        <>
+          <p className="mt-6 text-sm text-muted">
+            Menampilkan {awal}–{akhir} dari {hasil.total} menu
+          </p>
+
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {hasil.items.map((menu) => (
+              <MenuCard key={menu.id} menu={menu} />
+            ))}
+          </div>
+
+          <Pagination
+            page={hasil.page}
+            pages={hasil.pages}
+            buatTautan={(n) => buatTautan({ hal: n })}
+          />
+        </>
       )}
     </main>
   );

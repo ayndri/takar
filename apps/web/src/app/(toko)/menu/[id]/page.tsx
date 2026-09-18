@@ -41,9 +41,12 @@ export default async function DetailMenuPage({
   }
 
   try {
-    lainnya = (await getPublicMenus())
-      .filter((m) => m.id !== menu.id && m.category === menu.category)
-      .slice(0, 3);
+    // Ambil empat dari kategori yang sama, lalu buang menu yang sedang dibuka.
+    const sekategori = await getPublicMenus({
+      category: menu.category,
+      pageSize: 4,
+    });
+    lainnya = sekategori.items.filter((m) => m.id !== menu.id).slice(0, 3);
   } catch {
     lainnya = [];
   }
