@@ -5,6 +5,9 @@ import morgan from 'morgan'
 import { env } from './config/env.js'
 import { prisma } from './lib/prisma.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js'
+import { authRouter } from './modules/auth/auth.router.js'
+import { ingredientsRouter } from './modules/ingredients/ingredients.router.js'
+import { adminMenusRouter, publicMenusRouter } from './modules/menus/menus.router.js'
 
 /**
  * Dipisah dari server.ts supaya test bisa memakai instance ini
@@ -26,10 +29,13 @@ export function createApp(): Express {
     res.json({ status: 'ok', env: env.NODE_ENV, time: new Date().toISOString() })
   })
 
-  // Router modul dipasang di sini seiring fitur bertambah:
-  // app.use('/api/auth', authRouter)
-  // app.use('/api/ingredients', ingredientsRouter)
-  // app.use('/api/menus', menusRouter)
+  // Publik — dipakai halaman pelanggan, tanpa login.
+  app.use('/api/menus', publicMenusRouter)
+
+  // Perlu login.
+  app.use('/api/auth', authRouter)
+  app.use('/api/admin/menus', adminMenusRouter)
+  app.use('/api/ingredients', ingredientsRouter)
   // app.use('/api/orders', ordersRouter)
 
   app.use(notFoundHandler)
