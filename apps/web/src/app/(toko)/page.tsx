@@ -182,13 +182,17 @@ export default async function BerandaPage() {
           <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
             <h2 className="sr-only">Kategori menu</h2>
 
-            {/* Tinggi kartu dikunci dan labelnya dibatasi dua baris, supaya
-                "Jus & Smoothie" tidak membuat barisnya ikut naik turun. */}
-            <ul className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2">
-              <li className="shrink-0">
+            {/* Grid yang membungkus, bukan baris yang digeser: sebelas kartu
+                cuma sedikit lebih lebar dari kontainernya, dan menyisakan
+                satu batang geser untuk selisih sekecil itu lebih mengganggu
+                daripada membuatnya turun ke baris berikutnya.
+                Tinggi kartu dikunci dan label dibatasi dua baris supaya nama
+                panjang seperti "Jus & Smoothie" tidak menaikkan barisnya. */}
+            <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-11">
+              <li>
                 <Link
                   href="/menu"
-                  className="flex h-[112px] w-[92px] flex-col items-center gap-2 rounded-2xl border border-accent bg-accent-soft px-2 pt-3 text-center"
+                  className="flex h-[116px] w-full flex-col items-center gap-2 rounded-2xl border border-accent bg-accent-soft px-1.5 pt-3 text-center"
                 >
                   <span className="grid size-12 shrink-0 place-items-center rounded-full bg-surface font-display text-base font-semibold text-accent-ink">
                     {menus.length}
@@ -200,10 +204,10 @@ export default async function BerandaPage() {
               </li>
 
               {kategori.map((k) => (
-                <li key={k.nama} className="shrink-0">
+                <li key={k.nama}>
                   <Link
                     href={`/menu?kategori=${encodeURIComponent(k.nama)}`}
-                    className="flex h-[112px] w-[92px] flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-2 pt-3 text-center transition hover:border-accent"
+                    className="flex h-[116px] w-full flex-col items-center gap-2 rounded-2xl border border-border bg-surface px-1.5 pt-3 text-center transition hover:border-accent"
                   >
                     <span className="relative size-12 shrink-0 overflow-hidden rounded-full bg-sunk">
                       {k.foto && (
