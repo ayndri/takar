@@ -16,7 +16,7 @@ import {
 } from './modules/orders/orders.router.js'
 import { purchasesRouter } from './modules/purchases/purchases.router.js'
 import { reportsRouter } from './modules/reports/reports.router.js'
-import { tablesRouter } from './modules/tables/tables.router.js'
+import { adminTablesRouter, tablesRouter } from './modules/tables/tables.router.js'
 import { wasteRouter } from './modules/waste/waste.router.js'
 
 /**
@@ -54,6 +54,7 @@ export function createApp(): Express {
   app.use('/api/reports', reportsRouter)
   app.use('/api/admin/menus', adminMenusRouter)
   app.use('/api/admin/orders', adminOrdersRouter)
+  app.use('/api/admin/tables', adminTablesRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

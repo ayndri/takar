@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MejaTerpilih } from "@/components/meja-terpilih";
 import { MenuCard } from "@/components/menu-card";
 import { getPublicMenus, type PublicMenu } from "@/lib/api";
 import { urutkanKategori } from "@/lib/kategori";
@@ -55,6 +56,8 @@ export default async function KatalogPage({
           ? "Daftar menu sedang tidak bisa dimuat."
           : `${menus.filter((m) => m.available).length} dari ${menus.length} menu bisa dibuat sekarang.`}
       </p>
+
+      <MejaTerpilih />
 
       <form action="/menu" className="mt-6 flex max-w-md gap-2" role="search">
         <input

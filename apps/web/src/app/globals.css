@@ -71,6 +71,21 @@ body {
 }
 
 /*
+  Saat mencetak stiker QR, yang keluar hanya kartu mejanya: menu navigasi dan
+  tombol tidak ikut tercetak, dan kartu tidak boleh terpotong di batas halaman.
+*/
+@media print {
+  header,
+  footer {
+    display: none !important;
+  }
+
+  li {
+    break-inside: avoid;
+  }
+}
+
+/*
   Motif identitas: garis takaran seperti pada gelas ukur.
   Dipakai di kartu menu dan halaman detail untuk menunjukkan sisa porsi,
   jadi nama produk ("takar") punya wujud visual yang berulang.

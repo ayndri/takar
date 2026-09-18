@@ -15,6 +15,7 @@ const MENU: MenuItem[] = [
   { href: "/dashboard/pembelian", label: "Pembelian" },
   { href: "/dashboard/waste", label: "Waste" },
   { href: "/dashboard/opname", label: "Opname" },
+  { href: "/dashboard/meja", label: "Meja & QR" },
   { href: "/dashboard/laporan", label: "Laporan", ownerOnly: true },
 ];
 

@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { Decimal } from 'decimal.js'
 import { PrismaPg } from '@prisma/adapter-pg'
@@ -211,7 +212,9 @@ async function main() {
       prisma.cafeTable.create({
         data: {
           number: String(i + 1),
-          qrToken: `meja-${i + 1}-${Math.random().toString(36).slice(2, 10)}`,
+          // Acak penuh, bukan pola berisi nomor meja: kalau tokennya bisa
+          // ditebak, QR di meja kehilangan gunanya.
+          qrToken: randomBytes(9).toString('base64url'),
         },
       }),
     ),
