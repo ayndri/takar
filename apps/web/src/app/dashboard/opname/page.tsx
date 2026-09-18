@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/ui/modal";
+import { StatCard, StatRow } from "@/components/ui/stat-card";
+import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
+import { useSession } from "@/lib/session";
+import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 
 type Ingredient = {
@@ -29,17 +34,38 @@ type Opname = {
 };
 
 export default function OpnamePage() {
+  const session = useSession();
+  const pemilik = session?.user?.role === "OWNER";
+
   const bahan = useApi<Ingredient[]>("/api/ingredients");
   const riwayat = useApi<Opname[]>("/api/opname");
 
+  const [formTerbuka, setFormTerbuka] = useState(false);
   const [fisik, setFisik] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [cariBahan, setCariBahan] = useState("");
 
   const ingredients = bahan.data ?? [];
   const history = riwayat.data ?? [];
+
+  const tabel = useTable(history, {
+    cari: (o) => [o.by, o.note, ...o.items.map((i) => i.name)],
+    perHalaman: 8,
+  });
+
+  const terakhir = history[0];
+  const selisihTerakhir = terakhir ? Number(terakhir.totalValue) : 0;
+  const totalSelisih = history.reduce((s, o) => s + Number(o.totalValue), 0);
+  const dibuka = history.find((o) => o.id === openId);
+
+  const bahanTersaring = ingredients.filter((i) =>
+    i.name.toLowerCase().includes(cariBahan.trim().toLowerCase()),
+  );
+
+  const terisi = Object.values(fisik).filter((v) => v.trim() !== "").length;
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault();
@@ -70,6 +96,7 @@ export default function OpnamePage() {
 
       setFisik({});
       setNote("");
+      setFormTerbuka(false);
       await Promise.all([bahan.mutate(), riwayat.mutate()]);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Gagal menyimpan opname");
@@ -80,179 +107,300 @@ export default function OpnamePage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Stock opname</h1>
-        <p className="mt-1 text-sm text-muted">
-          Isi hasil hitung fisik. Angka sistem tidak ditimpa, selisihnya
-          dicatat sebagai penyesuaian di kartu stok.
-        </p>
+      <PageHead
+        judul="Stock opname"
+        deskripsi="Hitung fisik. Angka sistem tidak ditimpa, selisihnya dicatat sebagai penyesuaian."
+        aksi={
+          <button
+            type="button"
+            onClick={() => setFormTerbuka(true)}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-ink"
+          >
+            Mulai opname
+          </button>
+        }
+      />
+
+      <StatRow>
+        <StatCard
+          label="Jumlah opname"
+          nilai={riwayat.isLoading ? "…" : String(history.length)}
+        />
+        <StatCard
+          label="Opname terakhir"
+          nilai={terakhir ? formatWaktu(terakhir.date).split(",")[0]! : "belum ada"}
+          catatan={terakhir ? `oleh ${terakhir.by}` : undefined}
+        />
+        {pemilik && terakhir && (
+          <StatCard
+            label="Selisih terakhir"
+            nilai={formatRupiah(selisihTerakhir)}
+            nada={selisihTerakhir < 0 ? "rugi" : "netral"}
+          />
+        )}
+        {pemilik && history.length > 0 && (
+          <StatCard
+            label="Selisih keseluruhan"
+            nilai={formatRupiah(totalSelisih)}
+            catatan="dari semua opname"
+            nada={totalSelisih < 0 ? "rugi" : "netral"}
+          />
+        )}
+      </StatRow>
+
+      <div className="mb-3">
+        <SearchBox
+          nilai={tabel.kata}
+          onChange={tabel.setKata}
+          placeholder="Cari pencatat, catatan, atau bahan…"
+        />
       </div>
 
-      <form
-        onSubmit={simpan}
-        className="mb-8 rounded-xl border border-border bg-surface p-4"
-      >
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-left text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Tanggal</th>
+              <th className="px-4 py-3 font-medium">Oleh</th>
+              <th className="px-4 py-3 font-medium">Catatan</th>
+              <th className="px-4 py-3 text-right font-medium">Bahan diperiksa</th>
+              {pemilik && (
+                <th className="px-4 py-3 text-right font-medium">Selisih</th>
+              )}
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {riwayat.isLoading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                  Memuat riwayat opname…
+                </td>
+              </tr>
+            )}
+
+            {!riwayat.isLoading && tabel.items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                  {history.length === 0
+                    ? "Belum pernah opname."
+                    : "Tidak ada opname yang cocok."}
+                </td>
+              </tr>
+            )}
+
+            {tabel.items.map((op) => (
+              <tr key={op.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {formatWaktu(op.date)}
+                </td>
+                <td className="px-4 py-3 text-muted">{op.by}</td>
+                <td className="px-4 py-3 text-muted">{op.note ?? "—"}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {op.items.length}
+                </td>
+                {pemilik && (
+                  <td
+                    className={`px-4 py-3 text-right tabular-nums ${
+                      Number(op.totalValue) < 0 ? "text-danger" : ""
+                    }`}
+                  >
+                    {formatRupiah(op.totalValue)}
+                  </td>
+                )}
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(op.id)}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent"
+                  >
+                    Lihat rincian
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <TablePager
+        halaman={tabel.halaman}
+        halamanTotal={tabel.halamanTotal}
+        awal={tabel.awal}
+        akhir={tabel.akhir}
+        total={tabel.total}
+        satuan="opname"
+        onGanti={tabel.setHalaman}
+      />
+
+      {dibuka && (
+        <Modal
+          judul={`Opname ${formatWaktu(dibuka.date)}`}
+          deskripsi={`oleh ${dibuka.by}${dibuka.note ? ` · ${dibuka.note}` : ""}`}
+          lebar="lg"
+          onClose={() => setOpenId(null)}
+        >
           <table className="w-full text-sm">
             <thead className="text-left text-muted">
               <tr>
                 <th className="pb-2 font-medium">Bahan</th>
-                <th className="pb-2 text-right font-medium">Menurut sistem</th>
-                <th className="pb-2 text-right font-medium">Hitung fisik</th>
+                <th className="pb-2 text-right font-medium">Sistem</th>
+                <th className="pb-2 text-right font-medium">Fisik</th>
                 <th className="pb-2 text-right font-medium">Selisih</th>
+                {pemilik && (
+                  <th className="pb-2 text-right font-medium">Nilai</th>
+                )}
               </tr>
             </thead>
             <tbody>
-              {ingredients.map((item) => {
-                const isi = fisik[item.id] ?? "";
-                const selisih =
-                  isi.trim() === "" ? null : Number(isi) - Number(item.qty);
-
-                return (
-                  <tr key={item.id} className="border-t border-border">
-                    <td className="py-2">{item.name}</td>
-                    <td className="py-2 text-right text-muted tabular-nums">
-                      {item.qty} {item.baseUnit.toLowerCase()}
+              {dibuka.items.map((i) => (
+                <tr key={i.ingredientId} className="border-t border-border">
+                  <td className="py-2">{i.name}</td>
+                  <td className="py-2 text-right text-muted tabular-nums">
+                    {i.systemQty}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">
+                    {i.physicalQty}
+                  </td>
+                  <td
+                    className={`py-2 text-right tabular-nums ${
+                      Number(i.diff) < 0 ? "text-danger" : ""
+                    }`}
+                  >
+                    {Number(i.diff) > 0 ? "+" : ""}
+                    {i.diff}
+                  </td>
+                  {pemilik && (
+                    <td className="py-2 text-right tabular-nums">
+                      {formatRupiah(i.value)}
                     </td>
-                    <td className="py-2 text-right">
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={isi}
-                        onChange={(e) =>
-                          setFisik((prev) => ({
-                            ...prev,
-                            [item.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="·"
-                        className="w-28 rounded-lg border border-border bg-paper px-2 py-1 text-right"
-                      />
-                    </td>
-                    <td
-                      className={`py-2 text-right tabular-nums ${
-                        selisih === null
-                          ? "text-muted"
-                          : selisih < 0
-                            ? "text-danger"
-                            : selisih > 0
-                              ? "text-warning"
-                              : "text-muted"
-                      }`}
-                    >
-                      {selisih === null
-                        ? "·"
-                        : `${selisih > 0 ? "+" : ""}${selisih}`}
-                    </td>
-                  </tr>
-                );
-              })}
+                  )}
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
 
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Catatan opname (opsional)"
-          className="mt-4 w-full max-w-md rounded-lg border border-border bg-paper px-3 py-2 text-sm"
-        />
+          {pemilik && (
+            <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
+              <span>Total selisih</span>
+              <span
+                className={`tabular-nums ${
+                  Number(dibuka.totalValue) < 0 ? "text-danger" : ""
+                }`}
+              >
+                {formatRupiah(dibuka.totalValue)}
+              </span>
+            </p>
+          )}
+        </Modal>
+      )}
 
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
+      {formTerbuka && (
+        <Modal
+          judul="Hitung fisik"
+          deskripsi="Isi hanya bahan yang kamu hitung. Yang dikosongkan tidak ikut disesuaikan."
+          lebar="lg"
+          onClose={() => setFormTerbuka(false)}
         >
-          {saving ? "Menyimpan…" : "Simpan opname"}
-        </button>
-      </form>
-
-      <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">
-        Riwayat opname
-      </h2>
-
-      <ul className="space-y-3">
-        {history.length === 0 && (
-          <li className="rounded-xl border border-dashed border-border p-4 text-sm text-muted">
-            Belum pernah opname.
-          </li>
-        )}
-
-        {history.map((op) => (
-          <li
-            key={op.id}
-            className="rounded-xl border border-border bg-surface p-4"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
-                <p className="font-medium">{formatWaktu(op.date)}</p>
-                <p className="text-sm text-muted">
-                  oleh {op.by}
-                  {op.note ? ` · ${op.note}` : ""}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <p
-                  className={`text-sm font-medium ${
-                    Number(op.totalValue) < 0 ? "text-danger" : "text-muted"
-                  }`}
-                >
-                  Selisih {formatRupiah(op.totalValue)}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(openId === op.id ? null : op.id)}
-                  className="rounded-lg border border-border px-2.5 py-1 text-xs"
-                >
-                  {openId === op.id ? "Tutup" : "Rincian"}
-                </button>
-              </div>
+          <form onSubmit={simpan}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <SearchBox
+                nilai={cariBahan}
+                onChange={setCariBahan}
+                placeholder="Cari bahan…"
+              />
+              <p className="text-sm text-muted">{terisi} bahan terisi</p>
             </div>
 
-            {openId === op.id && (
-              <table className="mt-3 w-full border-t border-border text-sm">
-                <thead className="text-left text-muted">
-                  <tr>
-                    <th className="py-2 font-medium">Bahan</th>
-                    <th className="py-2 text-right font-medium">Sistem</th>
-                    <th className="py-2 text-right font-medium">Fisik</th>
-                    <th className="py-2 text-right font-medium">Selisih</th>
-                    <th className="py-2 text-right font-medium">Nilai</th>
+            <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-surface text-left text-muted">
+                  <tr className="border-b border-border">
+                    <th className="px-3 py-2 font-medium">Bahan</th>
+                    <th className="px-3 py-2 text-right font-medium">Sistem</th>
+                    <th className="px-3 py-2 text-right font-medium">Fisik</th>
+                    <th className="px-3 py-2 text-right font-medium">Selisih</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {op.items.map((i) => (
-                    <tr key={i.ingredientId} className="border-t border-border">
-                      <td className="py-2">{i.name}</td>
-                      <td className="py-2 text-right text-muted tabular-nums">
-                        {i.systemQty}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {i.physicalQty}
-                      </td>
-                      <td
-                        className={`py-2 text-right tabular-nums ${
-                          Number(i.diff) < 0 ? "text-danger" : ""
-                        }`}
-                      >
-                        {Number(i.diff) > 0 ? "+" : ""}
-                        {i.diff}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {formatRupiah(i.value)}
-                      </td>
-                    </tr>
-                  ))}
+                  {bahanTersaring.map((item) => {
+                    const isi = fisik[item.id] ?? "";
+                    const selisih =
+                      isi.trim() === "" ? null : Number(isi) - Number(item.qty);
+
+                    return (
+                      <tr key={item.id} className="border-t border-border">
+                        <td className="px-3 py-2">{item.name}</td>
+                        <td className="px-3 py-2 text-right text-muted tabular-nums">
+                          {item.qty} {item.baseUnit.toLowerCase()}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={isi}
+                            onChange={(e) =>
+                              setFisik((prev) => ({
+                                ...prev,
+                                [item.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="·"
+                            aria-label={`Hitung fisik ${item.name}`}
+                            className="w-28 rounded-lg border border-border bg-paper px-2 py-1 text-right"
+                          />
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums ${
+                            selisih === null
+                              ? "text-muted"
+                              : selisih < 0
+                                ? "text-danger"
+                                : selisih > 0
+                                  ? "text-warning"
+                                  : "text-muted"
+                          }`}
+                        >
+                          {selisih === null
+                            ? "·"
+                            : `${selisih > 0 ? "+" : ""}${selisih}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
-            )}
-          </li>
-        ))}
-      </ul>
+            </div>
+
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Catatan opname (opsional)"
+              className="mt-4 w-full rounded-xl border border-border bg-paper px-3 py-2.5 text-sm"
+            />
+
+            {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+
+            <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setFormTerbuka(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={saving || terisi === 0}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving ? "Menyimpan…" : `Simpan ${terisi} bahan`}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

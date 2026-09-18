@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/ui/modal";
+import { StatCard, StatRow } from "@/components/ui/stat-card";
+import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { formatRupiah, formatWaktu } from "@/lib/client-api";
+import { useSession } from "@/lib/session";
+import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 
 type Ingredient = {
@@ -31,45 +36,91 @@ type StockCard = {
 };
 
 const JENIS: Record<string, string> = {
-  PURCHASE: "Pembelian",
+  PURCHASE: "Barang masuk",
   SALE: "Terjual",
   WASTE: "Terbuang",
-  ADJUSTMENT: "Penyesuaian",
+  ADJUSTMENT: "Penyesuaian opname",
   RETURN: "Dikembalikan",
   TRANSFER_IN: "Masuk",
   TRANSFER_OUT: "Keluar",
 };
 
 export default function BahanPage() {
+  const session = useSession();
+  const pemilik = session?.user?.role === "OWNER";
+
   const { data, error, isLoading } = useApi<Ingredient[]>("/api/ingredients");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Kartu stok baru diambil saat barisnya dibuka — key null berarti SWR diam.
+  // Riwayat baru diambil saat barisnya dibuka: key null berarti SWR diam.
   const card = useApi<StockCard>(
     openId ? `/api/ingredients/${openId}/card` : null,
   );
 
   const items = data ?? [];
-  const totalNilai = items.reduce((sum, i) => sum + Number(i.value), 0);
+  const tabel = useTable(items, {
+    cari: (i) => [i.name, i.baseUnit],
+    perHalaman: 10,
+  });
+
+  const totalNilai = items.reduce((s, i) => s + Number(i.value), 0);
+  const menipis = items.filter((i) => i.isLow);
+  const terbesar = [...items].sort((a, b) => Number(b.value) - Number(a.value))[0];
+  const dibuka = items.find((i) => i.id === openId);
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Bahan baku</h1>
-        <p className="mt-1 text-sm text-muted">
-          {isLoading
-            ? "Memuat daftar bahan…"
-            : `Nilai persediaan sekarang ${formatRupiah(totalNilai)} · ${
-                items.filter((i) => i.isLow).length
-              } bahan perlu dibeli`}
-        </p>
-      </div>
+      <PageHead
+        judul="Bahan baku"
+        deskripsi="Stok dihitung dari riwayat pergerakan, bukan angka yang diketik."
+      />
+
+      <StatRow>
+        <StatCard
+          label="Jenis bahan"
+          nilai={isLoading ? "…" : String(items.length)}
+          catatan={`${items.filter((i) => !i.isLow).length} stoknya aman`}
+        />
+        <StatCard
+          label="Perlu dibeli"
+          nilai={isLoading ? "…" : String(menipis.length)}
+          catatan="di bawah stok minimum"
+          nada={menipis.length > 0 ? "sorot" : "netral"}
+        />
+        {pemilik && (
+          <StatCard
+            label="Nilai persediaan"
+            nilai={isLoading ? "…" : formatRupiah(totalNilai)}
+            catatan="stok x harga rata-rata"
+          />
+        )}
+        {pemilik && terbesar && (
+          <StatCard
+            label="Nilai terbesar"
+            nilai={terbesar.name}
+            catatan={formatRupiah(terbesar.value)}
+          />
+        )}
+      </StatRow>
 
       {error && (
         <p className="mb-4 rounded-lg border border-border bg-surface p-3 text-sm text-danger">
           {error.message}
         </p>
       )}
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <SearchBox
+          nilai={tabel.kata}
+          onChange={tabel.setKata}
+          placeholder="Cari nama bahan…"
+        />
+        {menipis.length > 0 && (
+          <p className="text-sm text-warning">
+            {menipis.map((m) => m.name).join(", ")} perlu dibeli
+          </p>
+        )}
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
@@ -78,16 +129,36 @@ export default function BahanPage() {
               <th className="px-4 py-3 font-medium">Bahan</th>
               <th className="px-4 py-3 text-right font-medium">Stok</th>
               <th className="px-4 py-3 text-right font-medium">Minimum</th>
-              <th className="px-4 py-3 text-right font-medium">
-                Harga rata-rata
-              </th>
-              <th className="px-4 py-3 text-right font-medium">Nilai</th>
+              {pemilik && (
+                <th className="px-4 py-3 text-right font-medium">
+                  Harga rata-rata
+                </th>
+              )}
+              {pemilik && (
+                <th className="px-4 py-3 text-right font-medium">Nilai</th>
+              )}
               <th className="px-4 py-3" />
             </tr>
           </thead>
 
           <tbody>
-            {items.map((item) => (
+            {isLoading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                  Memuat daftar bahan…
+                </td>
+              </tr>
+            )}
+
+            {!isLoading && tabel.items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
+                  Tidak ada bahan bernama &ldquo;{tabel.kata}&rdquo;.
+                </td>
+              </tr>
+            )}
+
+            {tabel.items.map((item) => (
               <tr key={item.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3">
                   <span className="font-medium">{item.name}</span>
@@ -103,22 +174,23 @@ export default function BahanPage() {
                 <td className="px-4 py-3 text-right text-muted tabular-nums">
                   {item.minStock}
                 </td>
-                <td className="px-4 py-3 text-right text-muted tabular-nums">
-                  {formatRupiah(item.avgCost)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {formatRupiah(item.value)}
-                </td>
+                {pemilik && (
+                  <td className="px-4 py-3 text-right text-muted tabular-nums">
+                    {formatRupiah(item.avgCost)}
+                  </td>
+                )}
+                {pemilik && (
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatRupiah(item.value)}
+                  </td>
+                )}
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"
-                    onClick={() =>
-                      setOpenId(openId === item.id ? null : item.id)
-                    }
-                    title={`Lihat setiap perubahan stok ${item.name}`}
+                    onClick={() => setOpenId(item.id)}
                     className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent"
                   >
-                    {openId === item.id ? "Tutup riwayat" : "Lihat riwayat"}
+                    Lihat riwayat
                   </button>
                 </td>
               </tr>
@@ -127,36 +199,58 @@ export default function BahanPage() {
         </table>
       </div>
 
+      <TablePager
+        halaman={tabel.halaman}
+        halamanTotal={tabel.halamanTotal}
+        awal={tabel.awal}
+        akhir={tabel.akhir}
+        total={tabel.total}
+        satuan="bahan"
+        onGanti={tabel.setHalaman}
+      />
+
       {openId && (
-        <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+        <Modal
+          judul={`Riwayat stok ${dibuka?.name ?? ""}`}
+          deskripsi="Tiap baris satu kejadian. Kolom saldo adalah sisa stok setelah kejadian itu, seperti buku tabungan."
+          lebar="lg"
+          onClose={() => setOpenId(null)}
+        >
           {!card.data ? (
             <p className="text-sm text-muted">
-              {card.error ? card.error.message : "Memuat kartu stok…"}
+              {card.error ? card.error.message : "Memuat riwayat…"}
             </p>
           ) : (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                  <h2 className="font-medium">
-                    Riwayat stok {card.data.ingredient.name}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-muted">
-                    Tiap baris satu kejadian: barang masuk, terjual, terbuang,
-                    atau penyesuaian opname. Kolom saldo menunjukkan sisa stok
-                    setelah kejadian itu, seperti buku tabungan.
+              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted">Stok sekarang</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {card.data.currentQty}{" "}
+                    {card.data.ingredient.baseUnit.toLowerCase()}
                   </p>
                 </div>
-
-                <p className="text-xs text-muted">
-                  ringkasan {card.data.currentQty} · hasil penjumlahan{" "}
-                  {card.data.ledgerQty}
-                  {card.data.currentQty !== card.data.ledgerQty && (
-                    <span className="ml-1 text-danger">tidak cocok</span>
-                  )}
-                </p>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted">Hasil penjumlahan riwayat</p>
+                  <p
+                    className={`mt-0.5 font-semibold tabular-nums ${
+                      card.data.currentQty !== card.data.ledgerQty
+                        ? "text-danger"
+                        : ""
+                    }`}
+                  >
+                    {card.data.ledgerQty}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted">Jumlah kejadian</p>
+                  <p className="mt-0.5 font-semibold tabular-nums">
+                    {card.data.movements.length}
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-3 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-muted">
                     <tr>
@@ -169,7 +263,7 @@ export default function BahanPage() {
                   <tbody>
                     {card.data.movements.map((m) => (
                       <tr key={m.id} className="border-t border-border">
-                        <td className="py-2 text-muted">
+                        <td className="py-2 whitespace-nowrap text-muted">
                           {formatWaktu(m.createdAt)}
                         </td>
                         <td className="py-2">
@@ -196,7 +290,7 @@ export default function BahanPage() {
               </div>
             </>
           )}
-        </div>
+        </Modal>
       )}
     </div>
   );

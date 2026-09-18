@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Select } from "@/components/select";
+import { Modal } from "@/components/ui/modal";
+import { StatCard, StatRow } from "@/components/ui/stat-card";
+import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
+import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 
 type Ingredient = {
@@ -45,19 +50,37 @@ export default function PembelianPage() {
   const bahan = useApi<Ingredient[]>("/api/ingredients");
   const nota = useApi<Purchase[]>("/api/purchases");
 
+  const [formTerbuka, setFormTerbuka] = useState(false);
   const [supplier, setSupplier] = useState("");
   const [rows, setRows] = useState<Baris[]>([{ ...BARIS_KOSONG }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const ingredients = bahan.data ?? [];
   const purchases = nota.data ?? [];
 
-  function ubahBaris(index: number, patch: Partial<Baris>) {
-    setRows((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+  const tabel = useTable(purchases, {
+    cari: (p) => [p.supplier, ...p.items.map((i) => i.ingredient.name)],
+    perHalaman: 8,
+  });
+
+  const totalBelanja = purchases.reduce((s, p) => s + Number(p.total), 0);
+
+  const perSupplier = new Map<string, number>();
+  for (const p of purchases) {
+    perSupplier.set(
+      p.supplier,
+      (perSupplier.get(p.supplier) ?? 0) + Number(p.total),
     );
+  }
+  const supplierTeratas = [...perSupplier].sort((a, b) => b[1] - a[1])[0];
+  const terakhir = purchases[0];
+  const dibuka = purchases.find((p) => p.id === openId);
+
+  function ubahBaris(index: number, patch: Partial<Baris>) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   }
 
   async function simpan(e: React.FormEvent) {
@@ -84,6 +107,7 @@ export default function PembelianPage() {
 
       setSupplier("");
       setRows([{ ...BARIS_KOSONG }]);
+      setFormTerbuka(false);
       setOk("Nota tersimpan. Stok dan harga rata-rata sudah diperbarui.");
       await Promise.all([bahan.mutate(), nota.mutate()]);
     } catch (e) {
@@ -95,177 +119,314 @@ export default function PembelianPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Pembelian</h1>
-        <p className="mt-1 text-sm text-muted">
-          Barang masuk dari supplier. Harga rata-rata tiap bahan ikut dihitung
-          ulang otomatis.
+      <PageHead
+        judul="Pembelian"
+        deskripsi="Barang masuk dari supplier. Harga rata-rata tiap bahan ikut dihitung ulang otomatis."
+        aksi={
+          <button
+            type="button"
+            onClick={() => setFormTerbuka(true)}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-ink"
+          >
+            Catat nota baru
+          </button>
+        }
+      />
+
+      <StatRow>
+        <StatCard
+          label="Jumlah nota"
+          nilai={nota.isLoading ? "…" : String(purchases.length)}
+        />
+        <StatCard
+          label="Total belanja"
+          nilai={nota.isLoading ? "…" : formatRupiah(totalBelanja)}
+        />
+        {supplierTeratas && (
+          <StatCard
+            label="Supplier terbesar"
+            nilai={supplierTeratas[0]}
+            catatan={formatRupiah(supplierTeratas[1])}
+          />
+        )}
+        {terakhir && (
+          <StatCard
+            label="Belanja terakhir"
+            nilai={formatRupiah(terakhir.total)}
+            catatan={formatWaktu(terakhir.date)}
+          />
+        )}
+      </StatRow>
+
+      {ok && (
+        <p className="mb-4 rounded-lg border border-border bg-surface p-3 text-sm text-accent-ink">
+          {ok}
         </p>
+      )}
+
+      <div className="mb-3">
+        <SearchBox
+          nilai={tabel.kata}
+          onChange={tabel.setKata}
+          placeholder="Cari supplier atau bahan…"
+        />
       </div>
 
-      <form
-        onSubmit={simpan}
-        className="mb-8 rounded-xl border border-border bg-surface p-4"
-      >
-        <label className="block text-sm">
-          <span className="text-muted">Supplier</span>
-          <input
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            required
-            placeholder="Contoh: Toko Bahan Jaya"
-            className="mt-1 w-full max-w-sm rounded-lg border border-border bg-paper px-3 py-2"
-          />
-        </label>
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-left text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Tanggal</th>
+              <th className="px-4 py-3 font-medium">Supplier</th>
+              <th className="px-4 py-3 font-medium">Isi</th>
+              <th className="px-4 py-3 text-right font-medium">Total</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {nota.isLoading && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                  Memuat nota…
+                </td>
+              </tr>
+            )}
 
-        <div className="mt-4 space-y-3">
-          {rows.map((row, index) => {
-            const bahan = ingredients.find((i) => i.id === row.ingredientId);
+            {!nota.isLoading && tabel.items.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                  {purchases.length === 0
+                    ? "Belum ada nota pembelian."
+                    : "Tidak ada nota yang cocok."}
+                </td>
+              </tr>
+            )}
 
-            return (
-              <div
-                key={index}
-                className="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]"
-              >
-                <select
-                  value={row.ingredientId}
-                  onChange={(e) =>
-                    ubahBaris(index, {
-                      ingredientId: e.target.value,
-                      purchaseUnitId: "",
-                    })
-                  }
-                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
-                >
-                  <option value="">Pilih bahan…</option>
-                  {ingredients.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+            {tabel.items.map((p) => (
+              <tr key={p.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3 whitespace-nowrap text-muted">
+                  {formatWaktu(p.date)}
+                </td>
+                <td className="px-4 py-3 font-medium">{p.supplier}</td>
+                <td className="px-4 py-3 text-muted">
+                  {p.items.length} bahan
+                  <span className="hidden sm:inline">
+                    {" "}
+                    ·{" "}
+                    {p.items
+                      .slice(0, 2)
+                      .map((i) => i.ingredient.name)
+                      .join(", ")}
+                    {p.items.length > 2 ? ", …" : ""}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {formatRupiah(p.total)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(p.id)}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent"
+                  >
+                    Lihat rincian
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-                <select
-                  value={row.purchaseUnitId}
-                  onChange={(e) =>
-                    ubahBaris(index, { purchaseUnitId: e.target.value })
-                  }
-                  disabled={!bahan}
-                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  <option value="">
-                    {bahan ? bahan.baseUnit.toLowerCase() : "satuan"}
-                  </option>
-                  {bahan?.purchaseUnits.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.factor})
-                    </option>
-                  ))}
-                </select>
+      <TablePager
+        halaman={tabel.halaman}
+        halamanTotal={tabel.halamanTotal}
+        awal={tabel.awal}
+        akhir={tabel.akhir}
+        total={tabel.total}
+        satuan="nota"
+        onGanti={tabel.setHalaman}
+      />
 
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={row.qty}
-                  onChange={(e) => ubahBaris(index, { qty: e.target.value })}
-                  placeholder="Jumlah"
-                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
-                />
-
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={row.unitPrice}
-                  onChange={(e) =>
-                    ubahBaris(index, { unitPrice: e.target.value })
-                  }
-                  placeholder="Harga/satuan"
-                  className="rounded-lg border border-border bg-paper px-3 py-2 text-sm"
-                />
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRows((prev) => prev.filter((_, i) => i !== index))
-                  }
-                  disabled={rows.length === 1}
-                  className="rounded-lg px-2 text-sm text-muted disabled:opacity-30"
-                  aria-label="Hapus baris"
-                >
-                  Hapus
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setRows((prev) => [...prev, { ...BARIS_KOSONG }])}
-          className="mt-3 rounded-lg border border-border px-3 py-1.5 text-sm"
+      {dibuka && (
+        <Modal
+          judul={dibuka.supplier}
+          deskripsi={formatWaktu(dibuka.date)}
+          lebar="lg"
+          onClose={() => setOpenId(null)}
         >
-          Tambah baris
-        </button>
-
-        {error && <p className="mt-4 text-sm text-danger">{error}</p>}
-        {ok && <p className="mt-4 text-sm text-accent">{ok}</p>}
-
-        <div className="mt-4 border-t border-border pt-4">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-accent px-4 py-2 font-medium text-white disabled:opacity-50"
-          >
-            {saving ? "Menyimpan…" : "Simpan nota"}
-          </button>
-        </div>
-      </form>
-
-      <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">
-        Riwayat pembelian
-      </h2>
-
-      <ul className="space-y-3">
-        {purchases.length === 0 && (
-          <li className="rounded-xl border border-dashed border-border p-4 text-sm text-muted">
-            Belum ada nota pembelian.
-          </li>
-        )}
-
-        {purchases.map((p) => (
-          <li key={p.id} className="rounded-xl border border-border bg-surface p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="font-medium">{p.supplier}</span>
-              <span className="text-sm text-muted">{formatWaktu(p.date)}</span>
-            </div>
-
-            <ul className="mt-2 space-y-1 text-sm">
-              {p.items.map((item) => (
-                <li key={item.id} className="flex justify-between gap-3">
-                  <span>
-                    {item.ingredient.name}: {item.qty}{" "}
+          <table className="w-full text-sm">
+            <thead className="text-left text-muted">
+              <tr>
+                <th className="pb-2 font-medium">Bahan</th>
+                <th className="pb-2 text-right font-medium">Dibeli</th>
+                <th className="pb-2 text-right font-medium">Masuk gudang</th>
+                <th className="pb-2 text-right font-medium">Harga</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dibuka.items.map((item) => (
+                <tr key={item.id} className="border-t border-border">
+                  <td className="py-2">{item.ingredient.name}</td>
+                  <td className="py-2 text-right tabular-nums">
+                    {item.qty}{" "}
                     {item.purchaseUnit?.name ??
                       item.ingredient.baseUnit.toLowerCase()}
-                    <span className="text-muted">
-                      {" "}
-                      (= {item.baseQty} {item.ingredient.baseUnit.toLowerCase()})
-                    </span>
-                  </span>
-                  <span className="text-muted">
+                  </td>
+                  <td className="py-2 text-right text-muted tabular-nums">
+                    {item.baseQty} {item.ingredient.baseUnit.toLowerCase()}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">
                     {formatRupiah(item.unitPrice)}
-                  </span>
-                </li>
+                  </td>
+                </tr>
               ))}
-            </ul>
+            </tbody>
+          </table>
 
-            <p className="mt-2 border-t border-border pt-2 text-right font-medium">
-              {formatRupiah(p.total)}
-            </p>
-          </li>
-        ))}
-      </ul>
+          <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
+            <span>Total</span>
+            <span className="tabular-nums">{formatRupiah(dibuka.total)}</span>
+          </p>
+
+          <p className="mt-3 text-sm text-muted">
+            Kolom &ldquo;masuk gudang&rdquo; adalah hasil konversi ke satuan
+            dasar. Satu karton susu dicatat sebagai 12.000 ml, karena itu yang
+            dipakai resep.
+          </p>
+        </Modal>
+      )}
+
+      {formTerbuka && (
+        <Modal
+          judul="Catat nota pembelian"
+          deskripsi="Stok bertambah dan harga rata-rata dihitung ulang begitu disimpan."
+          lebar="lg"
+          onClose={() => setFormTerbuka(false)}
+        >
+          <form onSubmit={simpan}>
+            <label className="block text-sm">
+              <span className="text-muted">Supplier</span>
+              <input
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                required
+                placeholder="Contoh: Toko Bahan Jaya"
+                className="mt-1 w-full max-w-sm rounded-xl border border-border bg-paper px-3 py-2.5"
+              />
+            </label>
+
+            <div className="mt-4 space-y-3">
+              {rows.map((row, index) => {
+                const dipilih = ingredients.find(
+                  (i) => i.id === row.ingredientId,
+                );
+
+                return (
+                  <div
+                    key={index}
+                    className="grid gap-2 sm:grid-cols-[2fr_1.2fr_1fr_1fr_auto]"
+                  >
+                    <Select
+                      value={row.ingredientId}
+                      onChange={(e) =>
+                        ubahBaris(index, {
+                          ingredientId: e.target.value,
+                          purchaseUnitId: "",
+                        })
+                      }
+                    >
+                      <option value="">Pilih bahan…</option>
+                      {ingredients.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </Select>
+
+                    <Select
+                      value={row.purchaseUnitId}
+                      onChange={(e) =>
+                        ubahBaris(index, { purchaseUnitId: e.target.value })
+                      }
+                      disabled={!dipilih}
+                    >
+                      <option value="">
+                        {dipilih ? dipilih.baseUnit.toLowerCase() : "satuan"}
+                      </option>
+                      {dipilih?.purchaseUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.factor})
+                        </option>
+                      ))}
+                    </Select>
+
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={row.qty}
+                      onChange={(e) => ubahBaris(index, { qty: e.target.value })}
+                      placeholder="Jumlah"
+                      className="rounded-xl border border-border bg-paper px-3 py-2.5 text-sm"
+                    />
+
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={row.unitPrice}
+                      onChange={(e) =>
+                        ubahBaris(index, { unitPrice: e.target.value })
+                      }
+                      placeholder="Harga/satuan"
+                      className="rounded-xl border border-border bg-paper px-3 py-2.5 text-sm"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRows((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      disabled={rows.length === 1}
+                      className="rounded-lg px-2 text-sm text-muted disabled:opacity-30"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setRows((prev) => [...prev, { ...BARIS_KOSONG }])}
+              className="mt-3 rounded-lg border border-border px-3 py-1.5 text-sm"
+            >
+              Tambah baris
+            </button>
+
+            {error && <p className="mt-4 text-sm text-danger">{error}</p>}
+
+            <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setFormTerbuka(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving ? "Menyimpan…" : "Simpan nota"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

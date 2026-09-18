@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Modal } from "@/components/ui/modal";
+import { StatCard, StatRow } from "@/components/ui/stat-card";
+import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, request } from "@/lib/client-api";
+import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 
 type MenuRow = {
@@ -17,14 +21,33 @@ type MenuRow = {
   recipes: { ingredientId: string; name: string; baseUnit: string; qty: string }[];
 };
 
+/** Di bawah angka ini margin dianggap perlu ditengok lagi. */
+const MARGIN_TIPIS = 50;
+
 export default function MenuPage() {
-  const { data, error, mutate } = useApi<MenuRow[]>("/api/admin/menus");
+  const { data, error, isLoading, mutate } = useApi<MenuRow[]>("/api/admin/menus");
   const [aksiError, setAksiError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sibuk, setSibuk] = useState<string | null>(null);
 
   const menus = data ?? [];
+  const tabel = useTable(menus, {
+    cari: (m) => [m.name, m.category],
+    perHalaman: 10,
+  });
+
+  const aktif = menus.filter((m) => m.isActive);
+  const habis = aktif.filter((m) => m.remainingPortions === 0);
+  const tipis = menus.filter((m) => Number(m.marginPercent) < MARGIN_TIPIS);
+  const marginRata =
+    menus.length > 0
+      ? menus.reduce((s, m) => s + Number(m.marginPercent), 0) / menus.length
+      : 0;
+
+  const dibuka = menus.find((m) => m.id === openId);
 
   async function ubahAktif(menu: MenuRow) {
+    setSibuk(menu.id);
     setAksiError(null);
 
     try {
@@ -35,18 +58,41 @@ export default function MenuPage() {
       await mutate();
     } catch (e) {
       setAksiError(e instanceof ApiError ? e.message : "Gagal mengubah menu");
+    } finally {
+      setSibuk(null);
     }
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Menu & resep</h1>
-        <p className="mt-1 text-sm text-muted">
-          HPP dihitung dari harga rata-rata bahan terkini. Urutkan perhatianmu
-          ke margin yang paling tipis.
-        </p>
-      </div>
+      <PageHead
+        judul="Menu & resep"
+        deskripsi="HPP dihitung dari harga rata-rata bahan terkini, jadi ikut berubah saat harga supplier naik."
+      />
+
+      <StatRow>
+        <StatCard
+          label="Menu aktif"
+          nilai={isLoading ? "…" : String(aktif.length)}
+          catatan={`dari ${menus.length} menu terdaftar`}
+        />
+        <StatCard
+          label="Sedang habis"
+          nilai={isLoading ? "…" : String(habis.length)}
+          catatan="bahannya tidak cukup"
+          nada={habis.length > 0 ? "sorot" : "netral"}
+        />
+        <StatCard
+          label="Margin rata-rata"
+          nilai={isLoading ? "…" : `${marginRata.toFixed(1)}%`}
+        />
+        <StatCard
+          label={`Margin di bawah ${MARGIN_TIPIS}%`}
+          nilai={isLoading ? "…" : String(tipis.length)}
+          catatan={tipis[0] ? `paling tipis: ${tipis[0].name}` : undefined}
+          nada={tipis.length > 0 ? "sorot" : "netral"}
+        />
+      </StatRow>
 
       {(error || aksiError) && (
         <p className="mb-4 rounded-lg border border-border bg-surface p-3 text-sm text-danger">
@@ -54,80 +100,158 @@ export default function MenuPage() {
         </p>
       )}
 
-      <ul className="space-y-3">
-        {menus.map((menu) => (
-          <li
-            key={menu.id}
-            className="rounded-xl border border-border bg-surface p-4"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-medium">{menu.name}</h2>
-                  <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs text-muted">
-                    {menu.category}
-                  </span>
+      <div className="mb-3">
+        <SearchBox
+          nilai={tabel.kata}
+          onChange={tabel.setKata}
+          placeholder="Cari menu atau kategori…"
+        />
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-left text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Menu</th>
+              <th className="px-4 py-3 font-medium">Kategori</th>
+              <th className="px-4 py-3 text-right font-medium">Harga</th>
+              <th className="px-4 py-3 text-right font-medium">HPP</th>
+              <th className="px-4 py-3 text-right font-medium">Margin</th>
+              <th className="px-4 py-3 text-right font-medium">Sisa porsi</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+
+          <tbody>
+            {isLoading && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
+                  Memuat daftar menu…
+                </td>
+              </tr>
+            )}
+
+            {!isLoading && tabel.items.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
+                  Tidak ada menu yang cocok.
+                </td>
+              </tr>
+            )}
+
+            {tabel.items.map((menu) => (
+              <tr key={menu.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-3">
+                  <span className="font-medium">{menu.name}</span>
                   {!menu.isActive && (
-                    <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs text-danger">
+                    <span className="ml-2 rounded bg-sunk px-1.5 py-0.5 text-xs text-muted">
                       nonaktif
                     </span>
                   )}
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  Bisa dibuat {menu.remainingPortions} porsi dengan stok sekarang
-                </p>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right text-sm">
-                  <p className="font-medium">{formatRupiah(menu.price)}</p>
-                  <p className="text-muted">
-                    HPP {formatRupiah(menu.cost)} · margin{" "}
-                    <span
-                      className={
-                        Number(menu.marginPercent) < 50 ? "text-warning" : ""
-                      }
-                    >
-                      {menu.marginPercent}%
-                    </span>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenId(openId === menu.id ? null : menu.id)
-                  }
-                  className="rounded-lg border border-border px-2.5 py-1 text-xs"
+                </td>
+                <td className="px-4 py-3 text-muted">{menu.category}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {formatRupiah(menu.price)}
+                </td>
+                <td className="px-4 py-3 text-right text-muted tabular-nums">
+                  {formatRupiah(menu.cost)}
+                </td>
+                <td
+                  className={`px-4 py-3 text-right tabular-nums ${
+                    Number(menu.marginPercent) < MARGIN_TIPIS ? "text-warning" : ""
+                  }`}
                 >
-                  {openId === menu.id ? "Tutup" : "Resep"}
-                </button>
+                  {menu.marginPercent}%
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {menu.remainingPortions === 0 ? (
+                    <span className="text-danger">habis</span>
+                  ) : (
+                    menu.remainingPortions
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(menu.id)}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent"
+                  >
+                    Lihat resep
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-                <button
-                  type="button"
-                  onClick={() => void ubahAktif(menu)}
-                  className="rounded-lg border border-border px-2.5 py-1 text-xs"
-                >
-                  {menu.isActive ? "Nonaktifkan" : "Aktifkan"}
-                </button>
-              </div>
+      <TablePager
+        halaman={tabel.halaman}
+        halamanTotal={tabel.halamanTotal}
+        awal={tabel.awal}
+        akhir={tabel.akhir}
+        total={tabel.total}
+        satuan="menu"
+        onGanti={tabel.setHalaman}
+      />
+
+      {dibuka && (
+        <Modal
+          judul={dibuka.name}
+          deskripsi={`${dibuka.category} · takaran untuk satu porsi`}
+          onClose={() => setOpenId(null)}
+        >
+          <div className="mb-4 grid grid-cols-3 gap-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted">Harga jual</p>
+              <p className="mt-0.5 font-semibold tabular-nums">
+                {formatRupiah(dibuka.price)}
+              </p>
             </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted">HPP</p>
+              <p className="mt-0.5 font-semibold tabular-nums">
+                {formatRupiah(dibuka.cost)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-xs text-muted">Untung per porsi</p>
+              <p className="mt-0.5 font-semibold tabular-nums">
+                {formatRupiah(dibuka.profit)}
+              </p>
+            </div>
+          </div>
 
-            {openId === menu.id && (
-              <ul className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
-                {menu.recipes.map((r) => (
-                  <li key={r.ingredientId} className="flex justify-between">
-                    <span>{r.name}</span>
-                    <span className="text-muted tabular-nums">
-                      {r.qty} {r.baseUnit.toLowerCase()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+          <h3 className="text-sm font-medium">Bahan</h3>
+          <ul className="mt-2 space-y-1 text-sm">
+            {dibuka.recipes.map((r) => (
+              <li
+                key={r.ingredientId}
+                className="flex justify-between border-b border-border py-1.5 last:border-0"
+              >
+                <span>{r.name}</span>
+                <span className="text-muted tabular-nums">
+                  {r.qty} {r.baseUnit.toLowerCase()}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+            <p className="text-sm text-muted">
+              Bisa dibuat {dibuka.remainingPortions} porsi dengan stok sekarang
+            </p>
+            <button
+              type="button"
+              onClick={() => void ubahAktif(dibuka)}
+              disabled={sibuk === dibuka.id}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              {dibuka.isActive ? "Nonaktifkan menu" : "Aktifkan menu"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
