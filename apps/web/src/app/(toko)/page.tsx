@@ -410,19 +410,91 @@ export default async function BerandaPage() {
             </section>
           )}
 
-          {/* ── janji layanan ── */}
-          <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-            <ul className="grid gap-x-6 gap-y-5 border-t border-border pt-8 sm:grid-cols-2 lg:grid-cols-5">
+          {/* ── janji layanan ──
+              Dijadikan kartu, bukan lima kolom teks telanjang: dengan kotak
+              dan ikon berlatar, baris ini terbaca sebagai satu bagian yang
+              disengaja, bukan sisa teks di kaki halaman. */}
+          <section className="mx-auto max-w-6xl px-4 pt-14 sm:px-6">
+            <h2 className="font-display text-3xl font-semibold tracking-tight">
+              Yang kamu dapat di sini
+            </h2>
+
+            <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {JANJI.map(({ Ikon, judul, detail }) => (
-                <li key={judul} className="flex gap-3">
-                  <Ikon className="mt-0.5 size-5 shrink-0 text-accent" />
-                  <div>
-                    <p className="text-sm font-medium">{judul}</p>
-                    <p className="mt-0.5 text-sm text-muted">{detail}</p>
-                  </div>
+                <li
+                  key={judul}
+                  className="rounded-2xl border border-border bg-surface p-4"
+                >
+                  <span className="grid size-10 place-items-center rounded-xl bg-accent-soft">
+                    <Ikon className="size-5 text-accent-ink" />
+                  </span>
+                  <p className="mt-3 font-medium">{judul}</p>
+                  <p className="mt-1 text-sm text-muted">{detail}</p>
                 </li>
               ))}
             </ul>
+          </section>
+
+          {/* ── penutup ──
+              Halaman perlu berakhir dengan satu ajakan, bukan berhenti begitu
+              saja. Foto di kanan diambil dari menu yang sedang tersedia, jadi
+              blok ini ikut berubah mengikuti isi dapur. */}
+          <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+            <div className="overflow-hidden rounded-3xl bg-forest">
+              <div className="grid items-center gap-8 p-7 sm:p-10 lg:grid-cols-[1.1fr_1fr]">
+                <div className="text-paper">
+                  <h2 className="font-display text-3xl leading-tight font-semibold text-balance sm:text-4xl">
+                    Sudah duduk? Tinggal pesan.
+                  </h2>
+                  <p className="mt-3 max-w-md text-paper/85">
+                    Pilih nomor meja, susun pesanan, lalu bayar di kasir saat
+                    minumanmu siap. Tidak perlu daftar akun, tidak perlu antre
+                    di depan.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      href="/menu"
+                      className="rounded-xl bg-paper px-6 py-3.5 font-medium text-forest transition hover:bg-paper/90"
+                    >
+                      Buka daftar menu
+                    </Link>
+                    <Link
+                      href="/pesanan"
+                      className="rounded-xl border border-paper/30 px-6 py-3.5 font-medium text-paper transition hover:border-paper/60"
+                    >
+                      Lacak pesanan
+                    </Link>
+                  </div>
+                </div>
+
+                <ul className="grid grid-cols-2 gap-3">
+                  {terlaris.slice(0, 4).map((m) => (
+                    <li key={m.id}>
+                      <Link
+                        href={`/menu/${m.id}`}
+                        className="group block overflow-hidden rounded-2xl bg-paper/10"
+                      >
+                        <span className="relative block aspect-4/3">
+                          {m.imageUrl && (
+                            <Image
+                              src={m.imageUrl}
+                              alt=""
+                              fill
+                              sizes="(max-width: 1024px) 45vw, 200px"
+                              className="object-cover transition duration-300 group-hover:scale-105"
+                            />
+                          )}
+                        </span>
+                        <span className="block px-3 py-2 text-sm font-medium text-paper">
+                          {m.name}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </section>
         </>
       )}
