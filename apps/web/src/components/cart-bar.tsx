@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { ApiError, formatRupiah, request } from "@/lib/client-api";
+import { simpanPesananTerakhir } from "@/lib/last-order";
+import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
 
 type CafeTable = { id: string; number: string };
@@ -17,8 +19,9 @@ export function CartBar() {
   const cart = useCart();
   const { data: tables } = useApi<CafeTable[]>("/api/tables");
 
+  const meja = useMeja();
+
   const [open, setOpen] = useState(false);
-  const [tableId, setTableId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -47,7 +50,7 @@ export function CartBar() {
       const order = await request<{ code: string }>("/api/orders", {
         method: "POST",
         body: JSON.stringify({
-          ...(tableId && { tableId }),
+          ...(meja.nilai && { tableId: meja.nilai }),
           ...(customerName.trim() && { customerName: customerName.trim() }),
           ...(note.trim() && { note: note.trim() }),
           items: cart.items.map((i) => ({ menuId: i.menuId, qty: i.qty })),
@@ -55,6 +58,7 @@ export function CartBar() {
       });
 
       cart.clear();
+      simpanPesananTerakhir(order.code);
       setOpen(false);
       router.push(`/pesanan/${order.code}`);
     } catch (e) {
@@ -153,8 +157,8 @@ export function CartBar() {
               <label className="block text-sm">
                 <span className="text-muted">Nomor meja</span>
                 <select
-                  value={tableId}
-                  onChange={(e) => setTableId(e.target.value)}
+                  value={meja.nilai ?? ""}
+                  onChange={(e) => meja.pilih(e.target.value || null)}
                   className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2"
                 >
                   <option value="">Bawa pulang / ambil sendiri</option>

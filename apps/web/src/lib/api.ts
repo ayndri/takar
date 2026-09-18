@@ -54,6 +54,9 @@ export type PublicMenu = {
   imageUrl: string | null
   available: boolean
   remainingPortions: number
+  /** Porsi terjual tujuh hari terakhir, dipakai menandai menu terlaris. */
+  soldThisWeek: number
+  ingredientCount: number
 }
 
 export const getPublicMenus = () => api<PublicMenu[]>('/api/menus')

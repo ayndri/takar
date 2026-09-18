@@ -11,14 +11,33 @@ import { getAvgCostMap, getStockMap } from '../stock/stock.service.js'
  * stok, bukan satu query per kartu menu.
  */
 export async function listPublicMenus() {
-  const [menus, stock] = await Promise.all([
+  const semingguLalu = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const [menus, stock, terjual] = await Promise.all([
     prisma.menu.findMany({
       where: { isActive: true },
       include: { recipes: { select: { ingredientId: true, qty: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     }),
     getStockMap(),
+    // Dipakai untuk menandai menu terlaris. Hanya pesanan yang benar-benar
+    // dikonfirmasi yang dihitung, jadi angkanya tidak bisa dinaikkan dengan
+    // mengirim pesanan lalu membatalkannya.
+    prisma.orderItem.groupBy({
+      by: ['menuId'],
+      _sum: { qty: true },
+      where: {
+        order: {
+          status: { in: ['CONFIRMED', 'PREPARING', 'READY', 'DONE'] },
+          confirmedAt: { gte: semingguLalu },
+        },
+      },
+    }),
   ])
+
+  const terjualPerMenu = new Map(
+    terjual.map((row) => [row.menuId, row._sum.qty ?? 0]),
+  )
 
   return menus.map((menu) => {
     const recipe: RecipeLine[] = menu.recipes.map((r) => ({
@@ -37,6 +56,8 @@ export async function listPublicMenus() {
       available: portions > 0,
       // Ditampilkan sebagai "tinggal 3 porsi" saat menipis.
       remainingPortions: portions,
+      soldThisWeek: terjualPerMenu.get(menu.id) ?? 0,
+      ingredientCount: menu.recipes.length,
     }
   })
 }

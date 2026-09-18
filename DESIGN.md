@@ -70,8 +70,21 @@ stok bisa dibaca sekilas tanpa harus membaca angka.
 
 ## Susunan halaman
 
-- `/` beranda: hero dengan pencarian, baris kategori, empat menu paling aman
-  dipesan, lalu panel yang menjelaskan kenapa menu bisa hilang sendiri.
+- `/` beranda, dari atas ke bawah:
+  1. **Header** berisi pemilih meja, kolom pencarian, navigasi, dan keranjang.
+     Pemilih meja menggantikan "antar ke alamat" pada aplikasi pesan-antar,
+     karena di kafe yang menentukan tujuan adalah nomor mejanya.
+  2. **Hero** dua kolom: teks dan pencarian di kiri, foto penuh di kanan.
+  3. **Baris kategori** berbentuk kartu bulat yang bisa digeser.
+  4. **Paling laku minggu ini**: tiga kartu, lalu satu panel hijau di kolom
+     keempat. Panel itu menempati posisi yang biasanya diisi spanduk diskon,
+     tapi isinya keadaan stok hari ini, bukan promo yang dikarang.
+  5. **Bar status pesanan** yang hanya muncul kalau perangkat ini memang punya
+     pesanan berjalan.
+  6. **Menu unggulan** berukuran besar di kiri dengan pemilih jumlah, dan grid
+     pendamping di kanan.
+  7. **Lima janji layanan** dengan ikon gambar sendiri, semuanya hal yang
+     benar-benar dilakukan aplikasi ini.
 - `/menu` katalog lengkap dengan pencarian dan saringan kategori.
 - `/menu/[id]` detail satu menu: foto, harga, sisa porsi, daftar bahan, dan
   pemilih jumlah.
@@ -93,6 +106,13 @@ Sangat sedikit, dan hanya sebagai respons terhadap tindakan: foto sedikit
 membesar saat kartu disentuh, tombol berubah gelap saat ditekan. Tidak ada
 animasi yang jalan sendiri saat halaman digulir, karena halaman ini dibuka
 untuk memesan minuman, bukan untuk ditonton.
+
+## Ikon
+
+Digambar sendiri sebagai SVG di `components/icons.tsx`, bukan diambil dari
+pustaka ikon umum. Tiap bentuk menunjuk sesuatu yang memang ada di aplikasi:
+gelas takar, kode QR meja, mesin kasir, catatan pesanan, jam. Tidak ada bentuk
+hiasan seperti kilau atau bintang yang tidak mewakili apa pun.
 
 ## Angka yang ditampilkan
 

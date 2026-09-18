@@ -10,30 +10,44 @@ import type { PublicMenu } from "@/lib/api";
 const AMBANG_MENIPIS = 5;
 
 /**
- * Kartu dipakai di beranda dan di katalog. Ukurannya sama di kedua tempat,
- * yang berbeda hanya jumlah kolomnya, supaya pelanggan mengenali bentuk yang
- * sama saat berpindah halaman.
+ * Kartu menu dipakai di beranda dan katalog.
+ *
+ * Varian `ringkas` hanya memperkecil foto dan menyembunyikan garis takaran,
+ * supaya grid pendamping di beranda tidak berebut perhatian dengan kartu
+ * unggulan di sebelahnya.
  */
-export function MenuCard({ menu }: { menu: PublicMenu }) {
+export function MenuCard({
+  menu,
+  peringkat,
+  ringkas = false,
+}: {
+  menu: PublicMenu;
+  peringkat?: string;
+  ringkas?: boolean;
+}) {
   const cart = useCart();
   const diKeranjang = cart.items.find((i) => i.menuId === menu.id)?.qty ?? 0;
   const habis = !menu.available;
   const menipis = menu.available && menu.remainingPortions <= AMBANG_MENIPIS;
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border bg-surface">
+    <article className="group flex flex-col overflow-hidden rounded-2xl bg-surface">
       <Link
         href={`/menu/${menu.id}`}
         className="block"
         aria-label={`Lihat detail ${menu.name}`}
       >
-        <div className="relative aspect-4/3 overflow-hidden bg-sunk">
+        <div
+          className={`relative overflow-hidden bg-sunk ${
+            ringkas ? "aspect-16/10" : "aspect-4/3"
+          }`}
+        >
           {menu.imageUrl ? (
             <Image
               src={menu.imageUrl}
               alt=""
               fill
-              sizes="(max-width: 640px) 100vw, 320px"
+              sizes={ringkas ? "(max-width: 640px) 100vw, 220px" : "(max-width: 640px) 100vw, 300px"}
               className={`object-cover transition duration-300 group-hover:scale-105 ${
                 habis ? "grayscale" : ""
               }`}
@@ -44,39 +58,58 @@ export function MenuCard({ menu }: { menu: PublicMenu }) {
             </div>
           )}
 
-          {habis && (
-            <span className="absolute top-3 left-3 rounded-lg bg-surface px-2.5 py-1 text-xs font-medium text-accent-ink">
-              Bahan habis
+          {peringkat && !habis && (
+            <span className="absolute top-3 left-3 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white">
+              {peringkat}
             </span>
           )}
 
-          {menipis && (
-            <span className="absolute top-3 left-3 rounded-lg bg-surface px-2.5 py-1 text-xs font-medium text-warning">
-              Tinggal {menu.remainingPortions} porsi
+          {habis ? (
+            <span className="absolute top-3 left-3 rounded-lg bg-surface px-2.5 py-1 text-xs font-medium text-accent-ink">
+              Bahan habis
             </span>
+          ) : (
+            menipis && (
+              <span className="absolute top-3 right-3 rounded-lg bg-surface px-2.5 py-1 text-xs font-medium text-warning">
+                Tinggal {menu.remainingPortions}
+              </span>
+            )
           )}
         </div>
       </Link>
 
-      <div className="p-4">
-        <p className="text-xs tracking-wide text-muted">{menu.category}</p>
+      <div className={`flex flex-1 flex-col ${ringkas ? "p-3.5" : "p-4"}`}>
+        <p className="text-xs text-muted">
+          {menu.category}
+          {!ringkas && menu.soldThisWeek > 0 && (
+            <span> · terjual {menu.soldThisWeek} minggu ini</span>
+          )}
+        </p>
 
-        <div className="mt-1 flex items-baseline justify-between gap-3">
-          <h3 className="font-display text-lg font-semibold">
-            <Link href={`/menu/${menu.id}`} className="hover:text-accent-ink">
-              {menu.name}
-            </Link>
-          </h3>
-          <span className="shrink-0 text-sm font-medium tabular-nums">
-            {formatRupiah(menu.price)}
-          </span>
-        </div>
+        <h3
+          className={`mt-1 font-display font-semibold ${
+            ringkas ? "text-base" : "text-lg"
+          }`}
+        >
+          <Link href={`/menu/${menu.id}`} className="hover:text-accent-ink">
+            {menu.name}
+          </Link>
+        </h3>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {habis ? (
-            <span className="text-xs text-muted">Menunggu bahan masuk</span>
+        <div className="mt-auto flex items-center justify-between gap-3 pt-3">
+          {ringkas || habis ? (
+            <span className="text-sm font-medium tabular-nums">
+              {formatRupiah(menu.price)}
+            </span>
           ) : (
-            <Takaran sisa={menu.remainingPortions} />
+            <div>
+              <span className="text-sm font-medium tabular-nums">
+                {formatRupiah(menu.price)}
+              </span>
+              <div className="mt-1.5">
+                <Takaran sisa={menu.remainingPortions} />
+              </div>
+            </div>
           )}
 
           {habis ? (
@@ -95,7 +128,7 @@ export function MenuCard({ menu }: { menu: PublicMenu }) {
               >
                 −
               </button>
-              <span className="w-6 text-center text-sm font-medium tabular-nums">
+              <span className="w-5 text-center text-sm font-medium tabular-nums">
                 {diKeranjang}
               </span>
               <button
