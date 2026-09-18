@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconCari, IconMeja } from "@/components/icons";
+import { Select } from "@/components/select";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
 
@@ -34,10 +35,10 @@ export function HeroSearch() {
       <label className="flex shrink-0 items-center gap-2 rounded-xl px-2 py-2 sm:py-0">
         <IconMeja className="size-4 text-accent" />
         <span className="sr-only">Nomor meja</span>
-        <select
+        <Select
+          polos
           value={meja.nilai ?? ""}
           onChange={(e) => meja.pilih(e.target.value || null)}
-          className="bg-transparent text-sm outline-none"
         >
           <option value="">Bawa pulang</option>
           {(tables ?? []).map((t) => (
@@ -45,7 +46,7 @@ export function HeroSearch() {
               Meja {t.number}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <span className="hidden h-6 w-px shrink-0 bg-border sm:block" />

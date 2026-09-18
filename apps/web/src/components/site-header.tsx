@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { IconCari, IconKeranjang, IconMeja } from "@/components/icons";
+import { Select } from "@/components/select";
 import { useCart } from "@/lib/cart";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
@@ -40,10 +41,10 @@ export function SiteHeader() {
         <label className="hidden shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface py-1.5 pr-2 pl-2.5 text-sm md:flex">
           <IconMeja className="size-4 text-accent" />
           <span className="sr-only">Nomor meja</span>
-          <select
+          <Select
+            polos
             value={meja.nilai ?? ""}
             onChange={(e) => meja.pilih(e.target.value || null)}
-            className="bg-transparent pr-1 outline-none"
           >
             <option value="">Bawa pulang</option>
             {(tables ?? []).map((t) => (
@@ -51,7 +52,7 @@ export function SiteHeader() {
                 Meja {t.number}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <form

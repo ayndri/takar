@@ -11,7 +11,13 @@ type Order = {
   total: string;
   createdAt: string;
   table: { number: string } | null;
-  items: { id: string; qty: number; unitPrice: string; menu: { name: string } }[];
+  items: {
+    id: string;
+    qty: number;
+    unitPrice: string;
+    note: string | null;
+    menu: { name: string };
+  }[];
 };
 
 /** Urutan yang dilihat pelanggan. CANCELLED tidak masuk garis waktu. */
@@ -101,8 +107,11 @@ export function OrderStatus({ code }: { code: string }) {
             <li key={item.id} className="flex justify-between gap-3 text-sm">
               <span>
                 {item.qty}× {item.menu.name}
+                {item.note && (
+                  <span className="block text-xs text-muted">{item.note}</span>
+                )}
               </span>
-              <span className="text-muted">
+              <span className="shrink-0 text-muted">
                 {formatRupiah(Number(item.unitPrice) * item.qty)}
               </span>
             </li>

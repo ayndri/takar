@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Select } from "@/components/select";
 import { useCart } from "@/lib/cart";
 import { ApiError, formatRupiah, request } from "@/lib/client-api";
 import { simpanPesananTerakhir } from "@/lib/last-order";
@@ -53,7 +54,11 @@ export function CartBar() {
           ...(meja.nilai && { tableId: meja.nilai }),
           ...(customerName.trim() && { customerName: customerName.trim() }),
           ...(note.trim() && { note: note.trim() }),
-          items: cart.items.map((i) => ({ menuId: i.menuId, qty: i.qty })),
+          items: cart.items.map((i) => ({
+            menuId: i.menuId,
+            qty: i.qty,
+            ...(i.note?.trim() && { note: i.note.trim() }),
+          })),
         }),
       });
 
@@ -119,36 +124,49 @@ export function CartBar() {
               </button>
             </div>
 
-            <ul className="mt-4 space-y-3">
+            {/* Catatan ditaruh di tiap menu, bukan hanya satu untuk seluruh
+                pesanan: "es sedikit" berlaku untuk satu gelas tertentu, dan
+                barista perlu tahu gelas yang mana. */}
+            <ul className="mt-4 space-y-4">
               {cart.items.map((item) => (
-                <li key={item.menuId} className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted">
-                      {formatRupiah(item.price)} × {item.qty}
-                    </p>
+                <li key={item.menuId}>
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{item.name}</p>
+                      <p className="text-xs text-muted">
+                        {formatRupiah(item.price)} × {item.qty}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(item.menuId, item.qty - 1)}
+                        aria-label={`Kurangi ${item.name}`}
+                        className="size-8 rounded-lg border border-border text-lg leading-none hover:bg-sunk"
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center text-sm tabular-nums">
+                        {item.qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => cart.setQty(item.menuId, item.qty + 1)}
+                        aria-label={`Tambah ${item.name}`}
+                        className="size-8 rounded-lg border border-border text-lg leading-none hover:bg-sunk"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => cart.setQty(item.menuId, item.qty - 1)}
-                      aria-label={`Kurangi ${item.name}`}
-                      className="size-8 rounded-lg border border-border text-lg leading-none hover:bg-sunk"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm tabular-nums">
-                      {item.qty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => cart.setQty(item.menuId, item.qty + 1)}
-                      aria-label={`Tambah ${item.name}`}
-                      className="size-8 rounded-lg border border-border text-lg leading-none hover:bg-sunk"
-                    >
-                      +
-                    </button>
-                  </div>
+
+                  <input
+                    value={item.note ?? ""}
+                    onChange={(e) => cart.setNote(item.menuId, e.target.value)}
+                    placeholder={`Catatan untuk ${item.name}`}
+                    aria-label={`Catatan untuk ${item.name}`}
+                    className="mt-2 w-full rounded-lg border border-border bg-paper px-3 py-1.5 text-sm"
+                  />
                 </li>
               ))}
             </ul>
@@ -156,18 +174,19 @@ export function CartBar() {
             <div className="mt-5 space-y-3 border-t border-border pt-4">
               <label className="block text-sm">
                 <span className="text-muted">Nomor meja</span>
-                <select
-                  value={meja.nilai ?? ""}
-                  onChange={(e) => meja.pilih(e.target.value || null)}
-                  className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2"
-                >
-                  <option value="">Bawa pulang / ambil sendiri</option>
-                  {(tables ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      Meja {t.number}
-                    </option>
-                  ))}
-                </select>
+                <span className="mt-1 block">
+                  <Select
+                    value={meja.nilai ?? ""}
+                    onChange={(e) => meja.pilih(e.target.value || null)}
+                  >
+                    <option value="">Bawa pulang / ambil sendiri</option>
+                    {(tables ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Meja {t.number}
+                      </option>
+                    ))}
+                  </Select>
+                </span>
               </label>
 
               <label className="block text-sm">
@@ -176,17 +195,19 @@ export function CartBar() {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Dipanggil saat pesanan siap"
-                  className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2.5"
                 />
               </label>
 
               <label className="block text-sm">
-                <span className="text-muted">Catatan (opsional)</span>
+                <span className="text-muted">
+                  Catatan untuk seluruh pesanan (opsional)
+                </span>
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Contoh: es sedikit, gula setengah"
-                  className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2"
+                  placeholder="Contoh: antar semua sekaligus"
+                  className="mt-1 w-full rounded-xl border border-border bg-paper px-3 py-2.5"
                 />
               </label>
             </div>

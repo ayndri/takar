@@ -7,6 +7,8 @@ export type CartItem = {
   name: string;
   price: string;
   qty: number;
+  /** Permintaan khusus untuk menu ini saja, misalnya "es sedikit". */
+  note?: string;
 };
 
 const STORAGE_KEY = "takar.cart";
@@ -102,10 +104,18 @@ export function useCart() {
     );
   }, []);
 
+  const setNote = useCallback((menuId: string, note: string) => {
+    simpan(
+      items.map((i) =>
+        i.menuId === menuId ? { ...i, note: note.trim() ? note : undefined } : i,
+      ),
+    );
+  }, []);
+
   const clear = useCallback(() => simpan([]), []);
 
   const total = current.reduce((sum, i) => sum + Number(i.price) * i.qty, 0);
   const count = current.reduce((sum, i) => sum + i.qty, 0);
 
-  return { items: current, add, setQty, clear, total, count };
+  return { items: current, add, setQty, setNote, clear, total, count };
 }

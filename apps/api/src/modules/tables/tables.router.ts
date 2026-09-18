@@ -17,14 +17,32 @@ export const tablesRouter = Router()
  * Sengaja tanpa qrToken: kalau token semua meja bisa diambil dari sini, QR di
  * meja kehilangan gunanya karena siapa pun bisa mengaku duduk di meja mana pun.
  */
+/**
+ * Nomor meja disimpan sebagai teks supaya kafe bisa memakai "A1" atau "Teras 2".
+ * Akibatnya pengurutan apa adanya menghasilkan 1, 10, 11, 2, jadi yang berupa
+ * angka diurutkan sebagai angka lebih dulu.
+ */
+function urutNomor<T extends { number: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const na = Number(a.number)
+    const nb = Number(b.number)
+    const aAngka = a.number.trim() !== '' && !Number.isNaN(na)
+    const bAngka = b.number.trim() !== '' && !Number.isNaN(nb)
+
+    if (aAngka && bAngka) return na - nb
+    if (aAngka) return -1
+    if (bAngka) return 1
+    return a.number.localeCompare(b.number, 'id')
+  })
+}
+
 tablesRouter.get('/', async (_req, res) => {
   const tables = await prisma.cafeTable.findMany({
     where: { isActive: true },
     select: { id: true, number: true },
-    orderBy: { number: 'asc' },
   })
 
-  res.json(tables)
+  res.json(urutNomor(tables))
 })
 
 /**
@@ -54,9 +72,7 @@ export const adminTablesRouter = Router()
 adminTablesRouter.use(requireAuth)
 
 adminTablesRouter.get('/', async (_req, res) => {
-  const tables = await prisma.cafeTable.findMany({
-    orderBy: { number: 'asc' },
-  })
+  const tables = urutNomor(await prisma.cafeTable.findMany())
 
   res.json(
     tables.map((t) => ({
