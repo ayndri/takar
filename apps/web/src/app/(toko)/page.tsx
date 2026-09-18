@@ -8,6 +8,7 @@ import {
   IconQR,
   IconTakar,
 } from "@/components/icons";
+import { HeroKartu } from "@/components/hero-kartu";
 import { HeroSearch } from "@/components/hero-search";
 import { MenuCard } from "@/components/menu-card";
 import { PilihanUtama } from "@/components/pilihan-utama";
@@ -84,74 +85,103 @@ export default async function BerandaPage() {
   }));
 
   const terlaris = [...tersedia].sort((a, b) => b.soldThisWeek - a.soldThisWeek);
-  const populer = terlaris.slice(0, 3);
+
+  /** Yang nomor satu naik ke kartu hero; sisanya mengisi bagian di bawahnya. */
   const unggulan = terlaris[0];
-  const pilihanLain = terlaris.slice(3, 9);
+  const populer = terlaris.slice(1, 4);
+  const sorotan = terlaris[4];
+  const pilihanLain = terlaris.slice(5, 11);
   const menipis = tersedia
     .filter((m) => m.remainingPortions <= 5)
     .sort((a, b) => a.remainingPortions - b.remainingPortions);
 
   return (
     <main>
-      {/* ── hero ── */}
-      <section className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
-        <div className="relative overflow-hidden rounded-3xl border border-border">
-          <Image
-            src={FOTO_HERO}
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 1280px) 100vw, 1152px"
-            className="object-cover object-right"
-          />
-
-          {/* Lapisan kertas dari kiri: teks tetap hitam di atas dasar terang,
-              jadi kontrasnya tidak bergantung pada isi fotonya. */}
-          <div className="absolute inset-0 bg-linear-to-r from-paper from-30% via-paper/95 via-55% to-paper/20" />
-
-          <div className="relative max-w-xl px-6 py-10 sm:px-10 sm:py-16 lg:py-24">
-            <p className="inline-flex rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent-ink">
+      {/* ── hero ──
+          Fotonya tidak lagi ditutup lapisan putih. Teks berdiri di kolomnya
+          sendiri di atas latar bersih, foto mendapat kolom penuh di sebelahnya,
+          dan satu kartu menu mengambang di perbatasan keduanya supaya ada
+          kedalaman sekaligus barang yang benar-benar bisa dipesan. */}
+      <section className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-10">
+        <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-10">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent-ink">
+              <span className="size-1.5 rounded-full bg-accent" />
               Pesan sendiri dari meja
             </p>
 
-            <h1 className="mt-4 font-display text-4xl leading-[1.03] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 font-display text-5xl leading-[0.98] font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl">
               Makan enak,
               <br />
-              takarannya pas.
+              <span className="text-accent">takarannya pas.</span>
             </h1>
 
-            <p className="mt-4 max-w-md text-muted">
+            <p className="mt-5 max-w-md text-lg text-muted">
               {menus.length} menu, dari kopi sampai nasi goreng, diracik setelah
               kamu pesan. Yang tampil di daftar cuma yang bahannya benar-benar
               ada di dapur.
             </p>
 
-            <div className="mt-6">
+            <div className="mt-7">
               <HeroSearch />
             </div>
 
             <div className="mt-4 flex flex-wrap gap-3 text-sm">
               <Link
                 href="/menu"
-                className="rounded-xl bg-accent px-5 py-3 font-medium text-white hover:bg-accent-ink"
+                className="rounded-xl bg-accent px-6 py-3.5 font-medium text-white transition hover:bg-accent-ink"
               >
                 Lihat menu hari ini
               </Link>
               <Link
                 href="/pesanan"
-                className="rounded-xl border border-border bg-surface px-5 py-3 font-medium hover:border-accent"
+                className="rounded-xl border border-border bg-surface px-6 py-3.5 font-medium transition hover:border-accent"
               >
                 Lacak pesanan
               </Link>
             </div>
 
             {!gagal && (
-              <p className="mt-6 text-sm text-muted">
-                <span className="font-medium text-ink">
-                  {tersedia.length} dari {menus.length}
-                </span>{" "}
-                menu bisa dibuat sekarang
-              </p>
+              <dl className="mt-8 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-6">
+                <div>
+                  <dt className="text-sm text-muted">Bisa dibuat sekarang</dt>
+                  <dd className="font-display text-2xl font-semibold">
+                    {tersedia.length}
+                    <span className="text-muted"> / {menus.length} menu</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted">Kategori</dt>
+                  <dd className="font-display text-2xl font-semibold">
+                    {kategori.length}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted">Terjual minggu ini</dt>
+                  <dd className="font-display text-2xl font-semibold">
+                    {menus.reduce((s, m) => s + m.soldThisWeek, 0)} porsi
+                  </dd>
+                </div>
+              </dl>
+            )}
+          </div>
+
+          <div className="relative">
+            <div className="relative aspect-4/5 overflow-hidden rounded-[2rem] bg-sunk sm:aspect-16/11 lg:aspect-4/5">
+              <Image
+                src={FOTO_HERO}
+                alt="Meja kafe dengan kopi dan makanan yang baru disajikan"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 560px"
+                className="object-cover"
+              />
+            </div>
+
+            {unggulan && (
+              <div className="absolute -bottom-5 -left-3 hidden sm:block lg:-left-10">
+                <HeroKartu menu={unggulan} />
+              </div>
             )}
           </div>
         </div>
@@ -229,14 +259,17 @@ export default async function BerandaPage() {
             </ul>
           </section>
 
-          {/* ── populer + panel ── */}
-          <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
+          {/* ── populer + panel ──
+              Diberi latar abu tipis supaya halaman punya jeda: tanpa itu
+              semua bagian menyatu jadi satu bidang putih panjang. */}
+          <section className="mt-14 bg-sunk py-12">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="flex items-baseline justify-between gap-4">
               <div>
-                <h2 className="font-display text-2xl font-semibold">
+                <h2 className="font-display text-3xl font-semibold tracking-tight">
                   Paling laku minggu ini
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1.5 text-muted">
                   Dihitung dari pesanan yang benar-benar dikonfirmasi kasir.
                 </p>
               </div>
@@ -248,7 +281,7 @@ export default async function BerandaPage() {
               </Link>
             </div>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-4">
+            <div className="mt-6 grid gap-4 lg:grid-cols-4">
               {populer.map((menu, i) => (
                 <MenuCard
                   key={menu.id}
@@ -300,6 +333,7 @@ export default async function BerandaPage() {
                 </Link>
               </div>
             </div>
+            </div>
           </section>
 
           {/* ── status pesanan berjalan ── */}
@@ -307,15 +341,15 @@ export default async function BerandaPage() {
             <ActiveOrderBar />
           </section>
 
-          {/* ── unggulan + pilihan ── */}
-          {unggulan && (
+          {/* ── sorotan + pilihan ── */}
+          {sorotan && (
             <section className="mx-auto max-w-6xl px-4 pt-10 sm:px-6">
               <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]">
                 <article className="overflow-hidden rounded-3xl border border-border bg-surface">
                   <div className="relative aspect-4/3">
-                    {unggulan.imageUrl && (
+                    {sorotan.imageUrl && (
                       <Image
-                        src={unggulan.imageUrl}
+                        src={sorotan.imageUrl}
                         alt=""
                         fill
                         sizes="(max-width: 1024px) 100vw, 440px"
@@ -328,27 +362,27 @@ export default async function BerandaPage() {
                   </div>
 
                   <div className="p-5">
-                    <p className="text-xs text-muted">{unggulan.category}</p>
+                    <p className="text-xs text-muted">{sorotan.category}</p>
                     <h3 className="mt-1 font-display text-2xl font-semibold">
-                      {unggulan.name}
+                      {sorotan.name}
                     </h3>
                     <p className="mt-1 text-sm text-muted">
-                      Terjual {unggulan.soldThisWeek} porsi tujuh hari terakhir,
-                      dari {unggulan.ingredientCount} bahan.
+                      Terjual {sorotan.soldThisWeek} porsi tujuh hari terakhir,
+                      dari {sorotan.ingredientCount} bahan.
                     </p>
 
                     <div className="mt-4 flex items-center gap-3">
-                      <Takaran sisa={unggulan.remainingPortions} />
+                      <Takaran sisa={sorotan.remainingPortions} />
                       <span className="text-sm text-muted">
-                        sisa {unggulan.remainingPortions} porsi
+                        sisa {sorotan.remainingPortions} porsi
                       </span>
                     </div>
 
                     <div className="mt-5 flex items-center justify-between gap-4">
                       <span className="font-display text-2xl font-semibold tabular-nums">
-                        {formatRupiah(unggulan.price)}
+                        {formatRupiah(sorotan.price)}
                       </span>
-                      <PilihanUtama menu={unggulan} />
+                      <PilihanUtama menu={sorotan} />
                     </div>
                   </div>
                 </article>
