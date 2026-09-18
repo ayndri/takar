@@ -11,7 +11,7 @@ import { request } from "./client-api";
  * ikut menumpang cache yang sama.
  */
 export function useApi<T>(path: string | null, options?: SWRConfiguration<T>) {
-  const { data, error, isLoading, mutate } = useSWR<T>(
+  const { data, error, isLoading, isValidating, mutate } = useSWR<T>(
     path,
     (key: string) => request<T>(key),
     {
@@ -20,5 +20,13 @@ export function useApi<T>(path: string | null, options?: SWRConfiguration<T>) {
     },
   );
 
-  return { data, error: error as Error | undefined, isLoading, mutate };
+  return {
+    data,
+    error: error as Error | undefined,
+    /** true hanya saat pemuatan pertama, waktu belum ada apa-apa di layar. */
+    isLoading,
+    /** true juga saat memuat ulang data yang sudah tampil. */
+    isValidating,
+    mutate,
+  };
 }

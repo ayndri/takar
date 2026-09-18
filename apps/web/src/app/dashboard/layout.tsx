@@ -9,6 +9,7 @@ import { notifySessionChanged, useSession } from "@/lib/session";
 type MenuItem = { href: string; label: string; ownerOnly?: boolean };
 
 const MENU: MenuItem[] = [
+  { href: "/dashboard", label: "Ringkasan" },
   { href: "/dashboard/pesanan", label: "Pesanan" },
   { href: "/dashboard/bahan", label: "Bahan baku" },
   { href: "/dashboard/menu", label: "Menu & resep", ownerOnly: true },
@@ -45,7 +46,7 @@ export default function DashboardLayout({
     <div className="flex min-h-full flex-col">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href="/dashboard/pesanan" className="font-semibold">
+          <Link href="/dashboard" className="font-semibold">
             Takar
           </Link>
 

@@ -41,7 +41,7 @@ const JENIS: Record<string, string> = {
 };
 
 export default function BahanPage() {
-  const { data, error } = useApi<Ingredient[]>("/api/ingredients");
+  const { data, error, isLoading } = useApi<Ingredient[]>("/api/ingredients");
   const [openId, setOpenId] = useState<string | null>(null);
 
   // Kartu stok baru diambil saat barisnya dibuka — key null berarti SWR diam.
@@ -57,8 +57,11 @@ export default function BahanPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Bahan baku</h1>
         <p className="mt-1 text-sm text-muted">
-          Nilai persediaan sekarang {formatRupiah(totalNilai)} ·{" "}
-          {items.filter((i) => i.isLow).length} bahan perlu dibeli
+          {isLoading
+            ? "Memuat daftar bahan…"
+            : `Nilai persediaan sekarang ${formatRupiah(totalNilai)} · ${
+                items.filter((i) => i.isLow).length
+              } bahan perlu dibeli`}
         </p>
       </div>
 
@@ -112,9 +115,10 @@ export default function BahanPage() {
                     onClick={() =>
                       setOpenId(openId === item.id ? null : item.id)
                     }
-                    className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap"
+                    title={`Lihat setiap perubahan stok ${item.name}`}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent"
                   >
-                    {openId === item.id ? "Tutup" : "Kartu stok"}
+                    {openId === item.id ? "Tutup riwayat" : "Lihat riwayat"}
                   </button>
                 </td>
               </tr>
@@ -131,12 +135,21 @@ export default function BahanPage() {
             </p>
           ) : (
             <>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="font-medium">
-                  Kartu stok: {card.data.ingredient.name}
-                </h2>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <div>
+                  <h2 className="font-medium">
+                    Riwayat stok {card.data.ingredient.name}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    Tiap baris satu kejadian: barang masuk, terjual, terbuang,
+                    atau penyesuaian opname. Kolom saldo menunjukkan sisa stok
+                    setelah kejadian itu, seperti buku tabungan.
+                  </p>
+                </div>
+
                 <p className="text-xs text-muted">
-                  cache {card.data.currentQty} · ledger {card.data.ledgerQty}
+                  ringkasan {card.data.currentQty} · hasil penjumlahan{" "}
+                  {card.data.ledgerQty}
                   {card.data.currentQty !== card.data.ledgerQty && (
                     <span className="ml-1 text-danger">tidak cocok</span>
                   )}

@@ -35,7 +35,9 @@ const KOLOM = [
 ] as const;
 
 export default function PesananPage() {
-  const { data, error, mutate } = useApi<Order[]>("/api/admin/orders?limit=100");
+  const { data, error, isLoading, isValidating, mutate } = useApi<Order[]>(
+    "/api/admin/orders?limit=100",
+  );
 
   const [aksiError, setAksiError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -116,9 +118,17 @@ export default function PesananPage() {
         <button
           type="button"
           onClick={() => void mutate()}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm"
+          disabled={isValidating}
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-60"
         >
-          Muat ulang
+          {isValidating && (
+            <span
+              aria-hidden="true"
+              className="size-3.5 animate-spin rounded-full border-2 border-border border-t-accent"
+            />
+          )}
+          {isValidating ? "Memuat…" : "Muat ulang"}
         </button>
       </div>
 
@@ -144,6 +154,10 @@ export default function PesananPage() {
             Tidak ada bahan yang terpotong. Pesanan masih berstatus baru masuk.
           </p>
         </div>
+      )}
+
+      {isLoading && (
+        <p className="mb-4 text-sm text-muted">Memuat papan pesanan…</p>
       )}
 
       <div className="grid gap-4 lg:grid-cols-4">

@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole } from '../../middleware/auth.js'
+import { getUser, requireAuth, requireRole } from '../../middleware/auth.js'
 import { getQuery, validateQuery } from '../../middleware/validate.js'
 import {
+  dashboardSummary,
   inventoryValue,
   lowStock,
   menuMargins,
@@ -25,6 +26,11 @@ reportsRouter.use(requireAuth)
 // Stok menipis dipakai barista untuk kerja harian.
 reportsRouter.get('/low-stock', async (_req, res) => {
   res.json(await lowStock())
+})
+
+// Ringkasan dasbor: isinya menyesuaikan peran yang membuka.
+reportsRouter.get('/dashboard', async (_req, res) => {
+  res.json(await dashboardSummary(getUser(res).role === 'OWNER'))
 })
 
 // Sisanya menyangkut uang — hanya owner.

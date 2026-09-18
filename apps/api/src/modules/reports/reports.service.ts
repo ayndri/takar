@@ -212,6 +212,75 @@ export async function usageTrend(range: Range = {}) {
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * Ringkasan untuk halaman depan dasbor.
+ *
+ * Satu panggilan, karena halaman itu perlu delapan angka sekaligus dan
+ * memanggil delapan endpoint hanya untuk mengisi satu layar itu boros.
+ *
+ * Bagian uang (omzet, laba, nilai persediaan) hanya diisi untuk pemilik.
+ * Barista tetap dapat bagian operasional, karena itu yang dia perlukan.
+ */
+export async function dashboardSummary(untukPemilik: boolean) {
+  const awalHariIni = new Date()
+  awalHariIni.setHours(0, 0, 0, 0)
+
+  const semingguLalu = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  const [pesananHariIni, menunggu, sedangJalan, persediaan, penjualanMinggu, pembuangan] =
+    await Promise.all([
+      prisma.order.findMany({
+        where: {
+          status: { in: ['CONFIRMED', 'PREPARING', 'READY', 'DONE'] },
+          confirmedAt: { gte: awalHariIni },
+        },
+        select: { total: true },
+      }),
+      prisma.order.count({ where: { status: 'PENDING' } }),
+      prisma.order.count({
+        where: { status: { in: ['CONFIRMED', 'PREPARING', 'READY'] } },
+      }),
+      inventoryValue(),
+      untukPemilik ? salesSummary({ from: semingguLalu.toISOString() }) : null,
+      untukPemilik ? wasteSummary({ from: semingguLalu.toISOString() }) : null,
+    ])
+
+  const omzetHariIni = pesananHariIni.reduce(
+    (sum, o) => sum.plus(o.total.toString()),
+    new Decimal(0),
+  )
+
+  const menipis = persediaan.items.filter((i) => i.isLow)
+
+  return {
+    hariIni: {
+      pesanan: pesananHariIni.length,
+      ...(untukPemilik && { omzet: omzetHariIni.toFixed(2) }),
+    },
+    antrean: {
+      menungguKonfirmasi: menunggu,
+      sedangJalan,
+    },
+    stok: {
+      menipis: menipis.length,
+      daftarMenipis: menipis.slice(0, 6),
+      ...(untukPemilik && { nilai: persediaan.total }),
+    },
+    ...(untukPemilik &&
+      penjualanMinggu && {
+        mingguIni: {
+          omzet: penjualanMinggu.revenue,
+          hpp: penjualanMinggu.cogs,
+          laba: penjualanMinggu.grossProfit,
+          margin: penjualanMinggu.marginPercent,
+          pesanan: penjualanMinggu.orderCount,
+          terbuang: pembuangan?.total ?? '0',
+          menuTeratas: penjualanMinggu.topMenus.slice(0, 5),
+        },
+      }),
+  }
+}
+
 /** HPP dan margin tiap menu dengan harga bahan terkini. */
 export async function menuMargins() {
   const [menus, avgCost] = await Promise.all([
