@@ -45,10 +45,12 @@ export async function lockStocks(
 
   const sorted = [...new Set(ingredientIds)].sort()
 
+  // Cast ke text[], bukan uuid[]: Prisma memetakan `String @id` ke kolom text,
+  // jadi membandingkannya dengan uuid membuat Postgres menolak querynya.
   const rows = await tx.$queryRawUnsafe<{ ingredient_id: string; qty: string }[]>(
     `select ingredient_id, qty::text
        from ingredient_stocks
-      where ingredient_id = any($1::uuid[])
+      where ingredient_id = any($1::text[])
       order by ingredient_id
         for update`,
     sorted,
