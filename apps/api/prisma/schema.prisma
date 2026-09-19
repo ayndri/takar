@@ -67,8 +67,9 @@ model User {
   role         Role     @default(STAFF)
   createdAt    DateTime @default(now()) @map("created_at")
 
-  wasteLogs WasteLog[]
-  opnames   StockOpname[]
+  wasteLogs   WasteLog[]
+  opnames     StockOpname[]
+  attachments Attachment[]
 
   @@map("users")
 }
@@ -314,6 +315,33 @@ model OpnameItem {
 
   @@unique([opnameId, ingredientId])
   @@map("opname_items")
+}
+
+/// Bukti foto atau PDF untuk transaksi yang menyangkut uang.
+///
+/// Isinya disimpan di kolom database, bukan di folder server, karena server
+/// aplikasi ini bisa diganti sewaktu-waktu oleh penyedia hosting dan foldernya
+/// ikut hilang. Volumenya kecil (beberapa nota per minggu), dan dengan begini
+/// bukti selalu ikut ke mana pun basis datanya dipulihkan.
+model Attachment {
+  id       String @id @default(uuid())
+  filename String
+  mimeType String @map("mime_type")
+  size     Int
+  data     Bytes
+
+  /// Dokumen yang dilampiri: "purchase", "waste", atau "opname".
+  /// Kosong berarti berkasnya sudah diunggah tapi dokumennya belum tersimpan.
+  refType String? @map("ref_type")
+  refId   String? @map("ref_id")
+
+  uploadedById String @map("uploaded_by")
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([refType, refId])
+  @@map("attachments")
 }
 
 // ─────────────────────────── inti: ledger ───────────────────────────

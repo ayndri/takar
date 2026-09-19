@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { Select } from "@/components/select";
+import {
+  DaftarBukti,
+  UnggahBukti,
+  type Bukti as BuktiFile,
+} from "@/components/ui/bukti";
 import { Modal } from "@/components/ui/modal";
 import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
@@ -23,6 +28,7 @@ type Purchase = {
   date: string;
   total: string;
   note: string | null;
+  buktiCount: number;
   items: {
     id: string;
     qty: string;
@@ -58,6 +64,7 @@ export default function PembelianPage() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [bukti, setBukti] = useState<BuktiFile[]>([]);
 
   const ingredients = bahan.data ?? [];
   const purchases = nota.data ?? [];
@@ -70,6 +77,7 @@ export default function PembelianPage() {
       supplier: (p) => p.supplier,
       isi: (p) => p.items.length,
       total: (p) => Number(p.total),
+      bukti: (p) => p.buktiCount,
     },
     urutanAwal: { kolom: "tanggal", arah: "turun" },
   });
@@ -93,6 +101,12 @@ export default function PembelianPage() {
 
   async function simpan(e: React.FormEvent) {
     e.preventDefault();
+
+    if (bukti.length === 0) {
+      setError("Unggah foto notanya dulu sebelum menyimpan");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setOk(null);
@@ -102,6 +116,7 @@ export default function PembelianPage() {
         method: "POST",
         body: JSON.stringify({
           supplier,
+          attachmentIds: bukti.map((b) => b.id),
           items: rows
             .filter((r) => r.ingredientId && r.qty && r.unitPrice)
             .map((r) => ({
@@ -115,6 +130,7 @@ export default function PembelianPage() {
 
       setSupplier("");
       setRows([{ ...BARIS_KOSONG }]);
+      setBukti([]);
       setFormTerbuka(false);
       setOk("Nota tersimpan. Stok dan harga rata-rata sudah diperbarui.");
       await Promise.all([bahan.mutate(), nota.mutate()]);
@@ -209,13 +225,19 @@ export default function PembelianPage() {
                 onUrutkan={tabel.urutkan}
                 rata="kanan"
               />
+              <SortHeader
+                label="Bukti"
+                kolom="bukti"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {nota.isLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
                   Memuat nota…
                 </td>
               </tr>
@@ -223,7 +245,7 @@ export default function PembelianPage() {
 
             {!nota.isLoading && tabel.items.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted">
+                <td colSpan={6} className="px-4 py-8 text-center text-muted">
                   {purchases.length === 0
                     ? "Belum ada nota pembelian."
                     : "Tidak ada nota yang cocok."}
@@ -251,6 +273,17 @@ export default function PembelianPage() {
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   {formatRupiah(p.total)}
+                </td>
+                <td className="px-4 py-3">
+                  {p.buktiCount > 0 ? (
+                    <span className="text-muted">
+                      {p.buktiCount} berkas
+                    </span>
+                  ) : (
+                    <span className="rounded bg-accent-soft px-1.5 py-0.5 text-xs text-warning">
+                      belum ada
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button
@@ -285,6 +318,11 @@ export default function PembelianPage() {
           onClose={() => setOpenId(null)}
         >
           <RincianNota nota={dibuka} />
+
+          <div className="mt-6 border-t border-border pt-4">
+            <h3 className="mb-3 text-sm font-medium">Bukti nota</h3>
+            <DaftarBukti refType="purchase" refId={dibuka.id} />
+          </div>
         </Modal>
       )}
 
@@ -397,6 +435,18 @@ export default function PembelianPage() {
               Tambah baris
             </button>
 
+            <div className="mt-5 border-t border-border pt-4">
+              <UnggahBukti
+                bukti={bukti}
+                wajib
+                keterangan="Foto nota dari supplier. Tanpa ini, angka belanja di sini tidak bisa dicocokkan dengan apa pun."
+                onTambah={(b) => setBukti((prev) => [...prev, b])}
+                onHapus={(id) =>
+                  setBukti((prev) => prev.filter((b) => b.id !== id))
+                }
+              />
+            </div>
+
             {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
             <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
@@ -409,7 +459,10 @@ export default function PembelianPage() {
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || bukti.length === 0}
+                title={
+                  bukti.length === 0 ? "Unggah foto nota dulu" : undefined
+                }
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 {saving ? "Menyimpan…" : "Simpan nota"}

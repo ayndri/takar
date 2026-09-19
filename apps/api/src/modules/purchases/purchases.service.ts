@@ -3,11 +3,14 @@ import { prisma } from '../../lib/prisma.js'
 import { badRequest, notFound } from '../../lib/errors.js'
 import { toBaseQty, unitCostPerBase, weightedAverageCost } from '../stock/stock-calculator.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
+import { hitungBukti, kaitkan } from '../attachments/attachments.service.js'
 
 export type CreatePurchaseInput = {
   supplier: string
   date?: string
   note?: string
+  /** Id berkas bukti yang sudah diunggah lebih dulu. Wajib minimal satu. */
+  attachmentIds: string[]
   items: {
     ingredientId: string
     purchaseUnitId?: string
@@ -29,6 +32,12 @@ export type CreatePurchaseInput = {
  */
 export async function createPurchase(input: CreatePurchaseInput) {
   if (input.items.length === 0) throw badRequest('Nota harus berisi minimal satu bahan')
+
+  // Ini satu-satunya tempat uang keluar ke pihak luar. Tanpa foto notanya,
+  // tidak ada yang bisa mencocokkan angka di sini dengan kenyataan.
+  if (input.attachmentIds.length === 0) {
+    throw badRequest('Nota pembelian harus disertai foto bukti')
+  }
 
   return prisma.$transaction(async (tx) => {
     const ingredientIds = [...new Set(input.items.map((i) => i.ingredientId))]
@@ -122,6 +131,10 @@ export async function createPurchase(input: CreatePurchaseInput) {
       include: { items: true },
     })
 
+    // Dikaitkan di dalam transaksi yang sama: kalau nota gagal disimpan,
+    // buktinya juga tidak jadi menempel ke dokumen mana pun.
+    await kaitkan(tx, input.attachmentIds, 'purchase', purchase.id)
+
     await applyMovements(
       tx,
       movements.map((m) => ({ ...m, refType: 'purchase', refId: purchase.id })),
@@ -139,7 +152,7 @@ export async function createPurchase(input: CreatePurchaseInput) {
 }
 
 export async function listPurchases(limit = 50) {
-  return prisma.purchase.findMany({
+  const rows = await prisma.purchase.findMany({
     include: {
       items: {
         include: {
@@ -151,6 +164,15 @@ export async function listPurchases(limit = 50) {
     orderBy: { date: 'desc' },
     take: limit,
   })
+
+  // Nota lama dari sebelum bukti diwajibkan tetap ada, jadi daftarnya perlu
+  // menunjukkan mana yang belum punya bukti.
+  const jumlahBukti = await hitungBukti(
+    'purchase',
+    rows.map((r) => r.id),
+  )
+
+  return rows.map((r) => ({ ...r, buktiCount: jumlahBukti.get(r.id) ?? 0 }))
 }
 
 export async function getPurchase(id: string) {

@@ -8,6 +8,10 @@ const createPurchaseSchema = z.object({
   supplier: z.string().min(1, 'Nama supplier wajib diisi').max(100),
   date: z.iso.datetime().optional(),
   note: z.string().max(200).optional(),
+  attachmentIds: z
+    .array(z.uuid())
+    .min(1, 'Nota pembelian harus disertai foto bukti')
+    .max(5),
   items: z
     .array(
       z.object({

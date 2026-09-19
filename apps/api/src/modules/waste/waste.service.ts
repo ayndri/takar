@@ -2,6 +2,7 @@ import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest } from '../../lib/errors.js'
 import { applyMovements } from '../stock/stock.service.js'
+import { hitungBukti, kaitkan } from '../attachments/attachments.service.js'
 
 export type WasteReason = 'SPILLED' | 'EXPIRED' | 'MISTAKE' | 'OTHER'
 
@@ -20,6 +21,8 @@ export async function createWaste(input: {
   qty: number
   reason: WasteReason
   note?: string
+  /** Opsional, tapi dianjurkan: foto bahan yang dibuang. */
+  attachmentIds?: string[]
   userId: string
 }) {
   if (input.qty <= 0) throw badRequest('Jumlah yang terbuang harus lebih dari nol')
@@ -42,6 +45,8 @@ export async function createWaste(input: {
       },
       include: { ingredient: { select: { name: true, baseUnit: true } } },
     })
+
+    await kaitkan(tx, input.attachmentIds ?? [], 'waste', log.id)
 
     await applyMovements(tx, [
       {
@@ -75,6 +80,11 @@ export async function listWaste(params: { from?: string; to?: string; limit?: nu
     take: params.limit ?? 100,
   })
 
+  const jumlahBukti = await hitungBukti(
+    'waste',
+    logs.map((l) => l.id),
+  )
+
   return logs.map((l) => ({
     id: l.id,
     createdAt: l.createdAt,
@@ -85,5 +95,6 @@ export async function listWaste(params: { from?: string; to?: string; limit?: nu
     reason: l.reason,
     note: l.note,
     by: l.user.name,
+    buktiCount: jumlahBukti.get(l.id) ?? 0,
   }))
 }

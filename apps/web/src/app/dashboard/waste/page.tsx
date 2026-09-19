@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { Select } from "@/components/select";
+import {
+  DaftarBukti,
+  UnggahBukti,
+  type Bukti as BuktiFile,
+} from "@/components/ui/bukti";
+import { Modal } from "@/components/ui/modal";
 import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
@@ -22,6 +28,7 @@ type WasteRow = {
   reason: string;
   note: string | null;
   by: string;
+  buktiCount: number;
 };
 
 const ALASAN = [
@@ -48,6 +55,8 @@ export default function WastePage() {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bukti, setBukti] = useState<BuktiFile[]>([]);
+  const [lihatBukti, setLihatBukti] = useState<WasteRow | null>(null);
 
   const ingredients = bahan.data ?? [];
   const logs = riwayat.data ?? [];
@@ -62,6 +71,7 @@ export default function WastePage() {
       alasan: (l) => LABEL_ALASAN[l.reason] ?? l.reason,
       nilai: (l) => Number(l.value),
       oleh: (l) => l.by,
+      bukti: (l) => l.buktiCount,
     },
     urutanAwal: { kolom: "waktu", arah: "turun" },
   });
@@ -96,11 +106,13 @@ export default function WastePage() {
           qty: Number(qty),
           reason,
           ...(note.trim() && { note: note.trim() }),
+          ...(bukti.length > 0 && { attachmentIds: bukti.map((b) => b.id) }),
         }),
       });
 
       setQty("");
       setNote("");
+      setBukti([]);
       await Promise.all([bahan.mutate(), riwayat.mutate()]);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Gagal menyimpan catatan");
@@ -197,6 +209,15 @@ export default function WastePage() {
           {saving ? "…" : "Catat"}
         </button>
 
+        <div className="border-t border-border pt-4 sm:col-span-5">
+          <UnggahBukti
+            bukti={bukti}
+            keterangan="Foto bahan yang dibuang. Tidak wajib, tapi tanpa ini catatan waste bertumpu pada ingatan saja."
+            onTambah={(b) => setBukti((prev) => [...prev, b])}
+            onHapus={(id) => setBukti((prev) => prev.filter((b) => b.id !== id))}
+          />
+        </div>
+
         {error && <p className="text-sm text-danger sm:col-span-5">{error}</p>}
       </form>
 
@@ -252,6 +273,12 @@ export default function WastePage() {
                 urutan={tabel.urutan}
                 onUrutkan={tabel.urutkan}
               />
+              <SortHeader
+                label="Bukti"
+                kolom="bukti"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
             </tr>
           </thead>
           <tbody>
@@ -292,6 +319,19 @@ export default function WastePage() {
                   </td>
                 )}
                 <td className="px-4 py-3 text-muted">{log.by}</td>
+                <td className="px-4 py-3">
+                  {log.buktiCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setLihatBukti(log)}
+                      className="rounded-lg border border-border px-2.5 py-1 text-xs hover:border-accent"
+                    >
+                      Lihat {log.buktiCount} foto
+                    </button>
+                  ) : (
+                    <span className="text-xs text-muted">tanpa foto</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -307,6 +347,16 @@ export default function WastePage() {
         satuan="catatan"
         onGanti={tabel.setHalaman}
       />
+
+      {lihatBukti && (
+        <Modal
+          judul={`Bukti ${lihatBukti.ingredient}`}
+          deskripsi={`${lihatBukti.qty} ${lihatBukti.baseUnit.toLowerCase()} · ${formatWaktu(lihatBukti.createdAt)} · dicatat ${lihatBukti.by}`}
+          onClose={() => setLihatBukti(null)}
+        >
+          <DaftarBukti refType="waste" refId={lihatBukti.id} />
+        </Modal>
+      )}
     </div>
   );
 }

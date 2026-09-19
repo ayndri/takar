@@ -5,6 +5,7 @@ import morgan from 'morgan'
 import { env } from './config/env.js'
 import { prisma } from './lib/prisma.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js'
+import { attachmentsRouter } from './modules/attachments/attachments.router.js'
 import { authRouter } from './modules/auth/auth.router.js'
 import { ingredientsRouter } from './modules/ingredients/ingredients.router.js'
 import { adminMenusRouter, publicMenusRouter } from './modules/menus/menus.router.js'
@@ -47,6 +48,7 @@ export function createApp(): Express {
 
   // ── perlu login ──
   app.use('/api/auth', authRouter)
+  app.use('/api/attachments', attachmentsRouter)
   app.use('/api/ingredients', ingredientsRouter)
   app.use('/api/purchases', purchasesRouter)
   app.use('/api/waste', wasteRouter)

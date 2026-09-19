@@ -9,6 +9,7 @@ const createWasteSchema = z.object({
   qty: z.number().positive('Jumlah yang terbuang harus lebih dari nol'),
   reason: z.enum(['SPILLED', 'EXPIRED', 'MISTAKE', 'OTHER']),
   note: z.string().max(200).optional(),
+  attachmentIds: z.array(z.uuid()).max(3).optional(),
 })
 
 const listWasteSchema = z.object({
