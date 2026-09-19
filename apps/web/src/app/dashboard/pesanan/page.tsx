@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
@@ -99,6 +100,15 @@ export default function PesananPage() {
       ...o.items.map((i) => i.menu.name),
     ],
     perHalaman: 10,
+    kolom: {
+      kode: (o) => o.code,
+      waktu: (o) => new Date(o.createdAt),
+      meja: (o) => (o.table ? Number(o.table.number) || o.table.number : ""),
+      isi: (o) => o.items.length,
+      status: (o) => LABEL[o.status],
+      total: (o) => Number(o.total),
+    },
+    urutanAwal: { kolom: "waktu", arah: "turun" },
   });
 
   const dibuka = orders.find((o) => o.id === openId);
@@ -349,14 +359,45 @@ export default function PesananPage() {
 
         <div className="overflow-x-auto rounded-xl border border-border bg-surface">
           <table className="w-full text-sm">
-            <thead className="border-b border-border text-left text-muted">
+            <thead className="border-b border-border text-muted">
               <tr>
-                <th className="px-4 py-3 font-medium">Kode</th>
-                <th className="px-4 py-3 font-medium">Waktu</th>
-                <th className="px-4 py-3 font-medium">Meja</th>
-                <th className="px-4 py-3 font-medium">Isi</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Total</th>
+                <SortHeader
+                  label="Kode"
+                  kolom="kode"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                />
+                <SortHeader
+                  label="Waktu"
+                  kolom="waktu"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                />
+                <SortHeader
+                  label="Meja"
+                  kolom="meja"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                />
+                <SortHeader
+                  label="Isi"
+                  kolom="isi"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                />
+                <SortHeader
+                  label="Status"
+                  kolom="status"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                />
+                <SortHeader
+                  label="Total"
+                  kolom="total"
+                  urutan={arsip.urutan}
+                  onUrutkan={arsip.urutkan}
+                  rata="kanan"
+                />
                 <th className="px-4 py-3" />
               </tr>
             </thead>

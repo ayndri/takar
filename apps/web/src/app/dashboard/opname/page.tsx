@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
@@ -54,6 +55,14 @@ export default function OpnamePage() {
   const tabel = useTable(history, {
     cari: (o) => [o.by, o.note, ...o.items.map((i) => i.name)],
     perHalaman: 8,
+    kolom: {
+      tanggal: (o) => new Date(o.date),
+      oleh: (o) => o.by,
+      catatan: (o) => o.note ?? "",
+      diperiksa: (o) => o.items.length,
+      selisih: (o) => Number(o.totalValue),
+    },
+    urutanAwal: { kolom: "tanggal", arah: "turun" },
   });
 
   const terakhir = history[0];
@@ -158,14 +167,41 @@ export default function OpnamePage() {
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-muted">
+          <thead className="border-b border-border text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Tanggal</th>
-              <th className="px-4 py-3 font-medium">Oleh</th>
-              <th className="px-4 py-3 font-medium">Catatan</th>
-              <th className="px-4 py-3 text-right font-medium">Bahan diperiksa</th>
+              <SortHeader
+                label="Tanggal"
+                kolom="tanggal"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Oleh"
+                kolom="oleh"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Catatan"
+                kolom="catatan"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Bahan diperiksa"
+                kolom="diperiksa"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
               {pemilik && (
-                <th className="px-4 py-3 text-right font-medium">Selisih</th>
+                <SortHeader
+                  label="Selisih"
+                  kolom="selisih"
+                  urutan={tabel.urutan}
+                  onUrutkan={tabel.urutkan}
+                  rata="kanan"
+                />
               )}
               <th className="px-4 py-3" />
             </tr>
@@ -240,58 +276,7 @@ export default function OpnamePage() {
           lebar="lg"
           onClose={() => setOpenId(null)}
         >
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted">
-              <tr>
-                <th className="pb-2 font-medium">Bahan</th>
-                <th className="pb-2 text-right font-medium">Sistem</th>
-                <th className="pb-2 text-right font-medium">Fisik</th>
-                <th className="pb-2 text-right font-medium">Selisih</th>
-                {pemilik && (
-                  <th className="pb-2 text-right font-medium">Nilai</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {dibuka.items.map((i) => (
-                <tr key={i.ingredientId} className="border-t border-border">
-                  <td className="py-2">{i.name}</td>
-                  <td className="py-2 text-right text-muted tabular-nums">
-                    {i.systemQty}
-                  </td>
-                  <td className="py-2 text-right tabular-nums">
-                    {i.physicalQty}
-                  </td>
-                  <td
-                    className={`py-2 text-right tabular-nums ${
-                      Number(i.diff) < 0 ? "text-danger" : ""
-                    }`}
-                  >
-                    {Number(i.diff) > 0 ? "+" : ""}
-                    {i.diff}
-                  </td>
-                  {pemilik && (
-                    <td className="py-2 text-right tabular-nums">
-                      {formatRupiah(i.value)}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {pemilik && (
-            <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
-              <span>Total selisih</span>
-              <span
-                className={`tabular-nums ${
-                  Number(dibuka.totalValue) < 0 ? "text-danger" : ""
-                }`}
-              >
-                {formatRupiah(dibuka.totalValue)}
-              </span>
-            </p>
-          )}
+          <RincianOpname opname={dibuka} pemilik={pemilik} />
         </Modal>
       )}
 
@@ -402,5 +387,147 @@ export default function OpnamePage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/**
+ * Isi pop-up rincian opname.
+ *
+ * Diurutkan dari selisih paling merugikan lebih dulu, karena itu yang
+ * biasanya dicari saat membuka hasil hitung fisik.
+ */
+function RincianOpname({
+  opname,
+  pemilik,
+}: {
+  opname: Opname;
+  pemilik: boolean;
+}) {
+  const tabel = useTable(opname.items, {
+    cari: (i) => [i.name],
+    perHalaman: 10,
+    kolom: {
+      bahan: (i) => i.name,
+      sistem: (i) => Number(i.systemQty),
+      fisik: (i) => Number(i.physicalQty),
+      selisih: (i) => Number(i.diff),
+      nilai: (i) => Number(i.value),
+    },
+    urutanAwal: { kolom: "selisih", arah: "naik" },
+  });
+
+  const banyak = opname.items.length > 10;
+
+  return (
+    <>
+      {banyak && (
+        <div className="mb-3">
+          <SearchBox
+            nilai={tabel.kata}
+            onChange={tabel.setKata}
+            placeholder="Cari bahan di opname ini…"
+          />
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-muted">
+            <tr>
+              <SortHeader
+                label="Bahan"
+                kolom="bahan"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Sistem"
+                kolom="sistem"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Fisik"
+                kolom="fisik"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Selisih"
+                kolom="selisih"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              {pemilik && (
+                <SortHeader
+                  label="Nilai"
+                  kolom="nilai"
+                  urutan={tabel.urutan}
+                  onUrutkan={tabel.urutkan}
+                  rata="kanan"
+                />
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {tabel.items.map((i) => (
+              <tr
+                key={i.ingredientId}
+                className="border-b border-border last:border-0"
+              >
+                <td className="px-4 py-2">{i.name}</td>
+                <td className="px-4 py-2 text-right text-muted tabular-nums">
+                  {i.systemQty}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {i.physicalQty}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right tabular-nums ${
+                    Number(i.diff) < 0 ? "text-danger" : ""
+                  }`}
+                >
+                  {Number(i.diff) > 0 ? "+" : ""}
+                  {i.diff}
+                </td>
+                {pemilik && (
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {formatRupiah(i.value)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {banyak && (
+        <TablePager
+          halaman={tabel.halaman}
+          halamanTotal={tabel.halamanTotal}
+          awal={tabel.awal}
+          akhir={tabel.akhir}
+          total={tabel.total}
+          satuan="bahan"
+          onGanti={tabel.setHalaman}
+        />
+      )}
+
+      {pemilik && (
+        <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
+          <span>Total selisih</span>
+          <span
+            className={`tabular-nums ${
+              Number(opname.totalValue) < 0 ? "text-danger" : ""
+            }`}
+          >
+            {formatRupiah(opname.totalValue)}
+          </span>
+        </p>
+      )}
+    </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Select } from "@/components/select";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
@@ -54,6 +55,15 @@ export default function WastePage() {
   const tabel = useTable(logs, {
     cari: (l) => [l.ingredient, LABEL_ALASAN[l.reason], l.note, l.by],
     perHalaman: 10,
+    kolom: {
+      waktu: (l) => new Date(l.createdAt),
+      bahan: (l) => l.ingredient,
+      jumlah: (l) => Number(l.qty),
+      alasan: (l) => LABEL_ALASAN[l.reason] ?? l.reason,
+      nilai: (l) => Number(l.value),
+      oleh: (l) => l.by,
+    },
+    urutanAwal: { kolom: "waktu", arah: "turun" },
   });
 
   const totalNilai = logs.reduce((s, l) => s + Number(l.value), 0);
@@ -200,16 +210,48 @@ export default function WastePage() {
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-muted">
+          <thead className="border-b border-border text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Waktu</th>
-              <th className="px-4 py-3 font-medium">Bahan</th>
-              <th className="px-4 py-3 text-right font-medium">Jumlah</th>
-              <th className="px-4 py-3 font-medium">Alasan</th>
+              <SortHeader
+                label="Waktu"
+                kolom="waktu"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Bahan"
+                kolom="bahan"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Jumlah"
+                kolom="jumlah"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Alasan"
+                kolom="alasan"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
               {pemilik && (
-                <th className="px-4 py-3 text-right font-medium">Nilai</th>
+                <SortHeader
+                  label="Nilai"
+                  kolom="nilai"
+                  urutan={tabel.urutan}
+                  onUrutkan={tabel.urutkan}
+                  rata="kanan"
+                />
               )}
-              <th className="px-4 py-3 font-medium">Oleh</th>
+              <SortHeader
+                label="Oleh"
+                kolom="oleh"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
             </tr>
           </thead>
           <tbody>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { formatRupiah, formatWaktu } from "@/lib/client-api";
@@ -21,18 +22,20 @@ type Ingredient = {
   purchaseUnits: { id: string; name: string; factor: string }[];
 };
 
+type Movement = {
+  id: string;
+  createdAt: string;
+  type: string;
+  qty: string;
+  balance: string;
+  note: string | null;
+};
+
 type StockCard = {
   ingredient: { name: string; baseUnit: string };
   currentQty: string;
   ledgerQty: string;
-  movements: {
-    id: string;
-    createdAt: string;
-    type: string;
-    qty: string;
-    balance: string;
-    note: string | null;
-  }[];
+  movements: Movement[];
 };
 
 const JENIS: Record<string, string> = {
@@ -52,7 +55,6 @@ export default function BahanPage() {
   const { data, error, isLoading } = useApi<Ingredient[]>("/api/ingredients");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Riwayat baru diambil saat barisnya dibuka: key null berarti SWR diam.
   const card = useApi<StockCard>(
     openId ? `/api/ingredients/${openId}/card` : null,
   );
@@ -61,6 +63,14 @@ export default function BahanPage() {
   const tabel = useTable(items, {
     cari: (i) => [i.name, i.baseUnit],
     perHalaman: 10,
+    kolom: {
+      nama: (i) => i.name,
+      stok: (i) => Number(i.qty),
+      minimum: (i) => Number(i.minStock),
+      harga: (i) => Number(i.avgCost),
+      nilai: (i) => Number(i.value),
+    },
+    urutanAwal: { kolom: "nama", arah: "naik" },
   });
 
   const totalNilai = items.reduce((s, i) => s + Number(i.value), 0);
@@ -124,18 +134,45 @@ export default function BahanPage() {
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-muted">
+          <thead className="border-b border-border text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Bahan</th>
-              <th className="px-4 py-3 text-right font-medium">Stok</th>
-              <th className="px-4 py-3 text-right font-medium">Minimum</th>
+              <SortHeader
+                label="Bahan"
+                kolom="nama"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Stok"
+                kolom="stok"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Minimum"
+                kolom="minimum"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
               {pemilik && (
-                <th className="px-4 py-3 text-right font-medium">
-                  Harga rata-rata
-                </th>
+                <SortHeader
+                  label="Harga rata-rata"
+                  kolom="harga"
+                  urutan={tabel.urutan}
+                  onUrutkan={tabel.urutkan}
+                  rata="kanan"
+                />
               )}
               {pemilik && (
-                <th className="px-4 py-3 text-right font-medium">Nilai</th>
+                <SortHeader
+                  label="Nilai"
+                  kolom="nilai"
+                  urutan={tabel.urutan}
+                  onUrutkan={tabel.urutkan}
+                  rata="kanan"
+                />
               )}
               <th className="px-4 py-3" />
             </tr>
@@ -153,7 +190,7 @@ export default function BahanPage() {
             {!isLoading && tabel.items.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                  Tidak ada bahan bernama &ldquo;{tabel.kata}&rdquo;.
+                  Tidak ada bahan yang cocok.
                 </td>
               </tr>
             )}
@@ -221,77 +258,154 @@ export default function BahanPage() {
               {card.error ? card.error.message : "Memuat riwayat…"}
             </p>
           ) : (
-            <>
-              <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border border-border p-3">
-                  <p className="text-xs text-muted">Stok sekarang</p>
-                  <p className="mt-0.5 font-semibold tabular-nums">
-                    {card.data.currentQty}{" "}
-                    {card.data.ingredient.baseUnit.toLowerCase()}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border p-3">
-                  <p className="text-xs text-muted">Hasil penjumlahan riwayat</p>
-                  <p
-                    className={`mt-0.5 font-semibold tabular-nums ${
-                      card.data.currentQty !== card.data.ledgerQty
-                        ? "text-danger"
-                        : ""
-                    }`}
-                  >
-                    {card.data.ledgerQty}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border p-3">
-                  <p className="text-xs text-muted">Jumlah kejadian</p>
-                  <p className="mt-0.5 font-semibold tabular-nums">
-                    {card.data.movements.length}
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-left text-muted">
-                    <tr>
-                      <th className="py-2 font-medium">Waktu</th>
-                      <th className="py-2 font-medium">Kejadian</th>
-                      <th className="py-2 text-right font-medium">Jumlah</th>
-                      <th className="py-2 text-right font-medium">Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {card.data.movements.map((m) => (
-                      <tr key={m.id} className="border-t border-border">
-                        <td className="py-2 whitespace-nowrap text-muted">
-                          {formatWaktu(m.createdAt)}
-                        </td>
-                        <td className="py-2">
-                          {JENIS[m.type] ?? m.type}
-                          {m.note && (
-                            <span className="text-muted"> · {m.note}</span>
-                          )}
-                        </td>
-                        <td
-                          className={`py-2 text-right tabular-nums ${
-                            Number(m.qty) < 0 ? "text-danger" : ""
-                          }`}
-                        >
-                          {Number(m.qty) > 0 ? "+" : ""}
-                          {m.qty}
-                        </td>
-                        <td className="py-2 text-right font-medium tabular-nums">
-                          {m.balance}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <RiwayatStok data={card.data} />
           )}
         </Modal>
       )}
     </div>
+  );
+}
+
+/**
+ * Isi pop-up riwayat.
+ *
+ * Dipisah jadi komponen sendiri karena punya pencarian, pengurutan, dan
+ * halamannya sendiri: satu bahan bisa punya ratusan pergerakan, dan menggulir
+ * sejauh itu di dalam jendela kecil tidak terpakai.
+ */
+function RiwayatStok({ data }: { data: StockCard }) {
+  const tabel = useTable(data.movements, {
+    cari: (m) => [JENIS[m.type] ?? m.type, m.note],
+    perHalaman: 8,
+    kolom: {
+      waktu: (m) => new Date(m.createdAt),
+      kejadian: (m) => JENIS[m.type] ?? m.type,
+      jumlah: (m) => Number(m.qty),
+      saldo: (m) => Number(m.balance),
+    },
+    urutanAwal: { kolom: "waktu", arah: "turun" },
+  });
+
+  const cocok = data.currentQty === data.ledgerQty;
+
+  return (
+    <>
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-muted">Stok sekarang</p>
+          <p className="mt-0.5 font-semibold tabular-nums">
+            {data.currentQty} {data.ingredient.baseUnit.toLowerCase()}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-muted">Hasil penjumlahan riwayat</p>
+          <p
+            className={`mt-0.5 font-semibold tabular-nums ${
+              cocok ? "" : "text-danger"
+            }`}
+          >
+            {data.ledgerQty}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-muted">Jumlah kejadian</p>
+          <p className="mt-0.5 font-semibold tabular-nums">
+            {data.movements.length}
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <SearchBox
+          nilai={tabel.kata}
+          onChange={tabel.setKata}
+          placeholder="Cari kejadian atau catatan…"
+        />
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-muted">
+            <tr>
+              <SortHeader
+                label="Waktu"
+                kolom="waktu"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Kejadian"
+                kolom="kejadian"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Jumlah"
+                kolom="jumlah"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Saldo"
+                kolom="saldo"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {tabel.items.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-muted">
+                  Tidak ada kejadian yang cocok.
+                </td>
+              </tr>
+            )}
+
+            {tabel.items.map((m) => (
+              <tr key={m.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-2 whitespace-nowrap text-muted">
+                  {formatWaktu(m.createdAt)}
+                </td>
+                <td className="px-4 py-2">
+                  {JENIS[m.type] ?? m.type}
+                  {m.note && <span className="text-muted"> · {m.note}</span>}
+                </td>
+                <td
+                  className={`px-4 py-2 text-right tabular-nums ${
+                    Number(m.qty) < 0 ? "text-danger" : ""
+                  }`}
+                >
+                  {Number(m.qty) > 0 ? "+" : ""}
+                  {m.qty}
+                </td>
+                <td className="px-4 py-2 text-right font-medium tabular-nums">
+                  {m.balance}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <TablePager
+        halaman={tabel.halaman}
+        halamanTotal={tabel.halamanTotal}
+        awal={tabel.awal}
+        akhir={tabel.akhir}
+        total={tabel.total}
+        satuan="kejadian"
+        onGanti={tabel.setHalaman}
+      />
+
+      {tabel.urutan?.kolom !== "waktu" && (
+        <p className="mt-2 text-xs text-muted">
+          Kolom saldo dihitung berurutan dari kejadian paling lama, jadi angkanya
+          paling mudah dibaca saat tabel diurutkan berdasarkan waktu.
+        </p>
+      )}
+    </>
   );
 }

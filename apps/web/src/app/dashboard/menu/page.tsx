@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, request } from "@/lib/client-api";
@@ -34,6 +35,15 @@ export default function MenuPage() {
   const tabel = useTable(menus, {
     cari: (m) => [m.name, m.category],
     perHalaman: 10,
+    kolom: {
+      nama: (m) => m.name,
+      kategori: (m) => m.category,
+      harga: (m) => Number(m.price),
+      hpp: (m) => Number(m.cost),
+      margin: (m) => Number(m.marginPercent),
+      sisa: (m) => m.remainingPortions,
+    },
+    urutanAwal: { kolom: "nama", arah: "naik" },
   });
 
   const aktif = menus.filter((m) => m.isActive);
@@ -110,14 +120,48 @@ export default function MenuPage() {
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-muted">
+          <thead className="border-b border-border text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Menu</th>
-              <th className="px-4 py-3 font-medium">Kategori</th>
-              <th className="px-4 py-3 text-right font-medium">Harga</th>
-              <th className="px-4 py-3 text-right font-medium">HPP</th>
-              <th className="px-4 py-3 text-right font-medium">Margin</th>
-              <th className="px-4 py-3 text-right font-medium">Sisa porsi</th>
+              <SortHeader
+                label="Menu"
+                kolom="nama"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Kategori"
+                kolom="kategori"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Harga"
+                kolom="harga"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="HPP"
+                kolom="hpp"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Margin"
+                kolom="margin"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Sisa porsi"
+                kolom="sisa"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
               <th className="px-4 py-3" />
             </tr>
           </thead>

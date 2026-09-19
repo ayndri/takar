@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Select } from "@/components/select";
 import { Modal } from "@/components/ui/modal";
+import { SortHeader } from "@/components/ui/sort-header";
 import { StatCard, StatRow } from "@/components/ui/stat-card";
 import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
@@ -64,6 +65,13 @@ export default function PembelianPage() {
   const tabel = useTable(purchases, {
     cari: (p) => [p.supplier, ...p.items.map((i) => i.ingredient.name)],
     perHalaman: 8,
+    kolom: {
+      tanggal: (p) => new Date(p.date),
+      supplier: (p) => p.supplier,
+      isi: (p) => p.items.length,
+      total: (p) => Number(p.total),
+    },
+    urutanAwal: { kolom: "tanggal", arah: "turun" },
   });
 
   const totalBelanja = purchases.reduce((s, p) => s + Number(p.total), 0);
@@ -174,12 +182,33 @@ export default function PembelianPage() {
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-muted">
+          <thead className="border-b border-border text-muted">
             <tr>
-              <th className="px-4 py-3 font-medium">Tanggal</th>
-              <th className="px-4 py-3 font-medium">Supplier</th>
-              <th className="px-4 py-3 font-medium">Isi</th>
-              <th className="px-4 py-3 text-right font-medium">Total</th>
+              <SortHeader
+                label="Tanggal"
+                kolom="tanggal"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Supplier"
+                kolom="supplier"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Isi"
+                kolom="isi"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Total"
+                kolom="total"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -255,45 +284,7 @@ export default function PembelianPage() {
           lebar="lg"
           onClose={() => setOpenId(null)}
         >
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted">
-              <tr>
-                <th className="pb-2 font-medium">Bahan</th>
-                <th className="pb-2 text-right font-medium">Dibeli</th>
-                <th className="pb-2 text-right font-medium">Masuk gudang</th>
-                <th className="pb-2 text-right font-medium">Harga</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dibuka.items.map((item) => (
-                <tr key={item.id} className="border-t border-border">
-                  <td className="py-2">{item.ingredient.name}</td>
-                  <td className="py-2 text-right tabular-nums">
-                    {item.qty}{" "}
-                    {item.purchaseUnit?.name ??
-                      item.ingredient.baseUnit.toLowerCase()}
-                  </td>
-                  <td className="py-2 text-right text-muted tabular-nums">
-                    {item.baseQty} {item.ingredient.baseUnit.toLowerCase()}
-                  </td>
-                  <td className="py-2 text-right tabular-nums">
-                    {formatRupiah(item.unitPrice)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
-            <span>Total</span>
-            <span className="tabular-nums">{formatRupiah(dibuka.total)}</span>
-          </p>
-
-          <p className="mt-3 text-sm text-muted">
-            Kolom &ldquo;masuk gudang&rdquo; adalah hasil konversi ke satuan
-            dasar. Satu karton susu dicatat sebagai 12.000 ml, karena itu yang
-            dipakai resep.
-          </p>
+          <RincianNota nota={dibuka} />
         </Modal>
       )}
 
@@ -428,5 +419,116 @@ export default function PembelianPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/**
+ * Isi pop-up rincian nota.
+ *
+ * Punya pengurutan sendiri: nota belanja awal berisi puluhan bahan, dan yang
+ * dicari biasanya "mana yang paling mahal", bukan urutan ketiknya.
+ */
+function RincianNota({ nota }: { nota: Purchase }) {
+  const tabel = useTable(nota.items, {
+    cari: (i) => [i.ingredient.name],
+    perHalaman: 10,
+    kolom: {
+      bahan: (i) => i.ingredient.name,
+      dibeli: (i) => Number(i.qty),
+      masuk: (i) => Number(i.baseQty),
+      harga: (i) => Number(i.unitPrice),
+    },
+    urutanAwal: { kolom: "harga", arah: "turun" },
+  });
+
+  return (
+    <>
+      {nota.items.length > 10 && (
+        <div className="mb-3">
+          <SearchBox
+            nilai={tabel.kata}
+            onChange={tabel.setKata}
+            placeholder="Cari bahan di nota ini…"
+          />
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-muted">
+            <tr>
+              <SortHeader
+                label="Bahan"
+                kolom="bahan"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+              />
+              <SortHeader
+                label="Dibeli"
+                kolom="dibeli"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Masuk gudang"
+                kolom="masuk"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+              <SortHeader
+                label="Harga"
+                kolom="harga"
+                urutan={tabel.urutan}
+                onUrutkan={tabel.urutkan}
+                rata="kanan"
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {tabel.items.map((item) => (
+              <tr key={item.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-2">{item.ingredient.name}</td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {item.qty}{" "}
+                  {item.purchaseUnit?.name ??
+                    item.ingredient.baseUnit.toLowerCase()}
+                </td>
+                <td className="px-4 py-2 text-right text-muted tabular-nums">
+                  {item.baseQty} {item.ingredient.baseUnit.toLowerCase()}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">
+                  {formatRupiah(item.unitPrice)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {nota.items.length > 10 && (
+        <TablePager
+          halaman={tabel.halaman}
+          halamanTotal={tabel.halamanTotal}
+          awal={tabel.awal}
+          akhir={tabel.akhir}
+          total={tabel.total}
+          satuan="bahan"
+          onGanti={tabel.setHalaman}
+        />
+      )}
+
+      <p className="mt-4 flex justify-between border-t border-border pt-3 font-medium">
+        <span>Total nota</span>
+        <span className="tabular-nums">{formatRupiah(nota.total)}</span>
+      </p>
+
+      <p className="mt-3 text-sm text-muted">
+        Kolom &ldquo;masuk gudang&rdquo; adalah hasil konversi ke satuan dasar.
+        Satu karton susu dicatat sebagai 12.000 ml, karena itu yang dipakai
+        resep.
+      </p>
+    </>
   );
 }
