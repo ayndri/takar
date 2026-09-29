@@ -1,6 +1,6 @@
 import cors from 'cors'
-import express, { type Express } from 'express'
-import helmet from 'helmet'
+import express, { type Express, type RequestHandler } from 'express'
+import helmetModule, { type HelmetOptions } from 'helmet'
 import morgan from 'morgan'
 import { env } from './config/env.js'
 import { prisma } from './lib/prisma.js'
@@ -25,6 +25,21 @@ import { reportsRouter } from './modules/reports/reports.router.js'
 import { publicSettingsRouter, settingsRouter } from './modules/settings/settings.router.js'
 import { adminTablesRouter, tablesRouter } from './modules/tables/tables.router.js'
 import { wasteRouter } from './modules/waste/waste.router.js'
+
+/**
+ * helmet menaruh sintaks ESM (`export { helmet as default }`) di dalam berkas
+ * tipe CJS-nya, tanpa `export =` sama sekali. Akibatnya bentuk yang diterima
+ * TypeScript berbeda tergantung jalur mana yang dipilih saat menyelesaikan
+ * paketnya: lewat `import` yang didapat fungsinya, lewat `require` yang
+ * didapat seluruh namespace-nya.
+ *
+ * Di laptop yang terpilih jalur `import`, di sebagian lingkungan build yang
+ * terpilih `require` — dan di situ `helmet()` gagal dikompilasi dengan pesan
+ * "has no call signatures". Bedanya baru muncul saat deploy, jadi diambil
+ * saja mana pun yang tersedia.
+ */
+const helmet = ((helmetModule as unknown as { default?: unknown }).default ??
+  helmetModule) as (options?: HelmetOptions) => RequestHandler
 
 /**
  * Dipisah dari server.ts supaya test bisa memakai instance ini
