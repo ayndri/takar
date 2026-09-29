@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import { env } from './config/env.js'
 import { prisma } from './lib/prisma.js'
+import { requireFeature } from './middleware/feature.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js'
 import { attachmentsRouter } from './modules/attachments/attachments.router.js'
 import { authRouter } from './modules/auth/auth.router.js'
@@ -16,7 +17,12 @@ import {
   publicOrdersRouter,
 } from './modules/orders/orders.router.js'
 import { purchasesRouter } from './modules/purchases/purchases.router.js'
+import {
+  adminReservationsRouter,
+  publicReservationsRouter,
+} from './modules/reservations/reservations.router.js'
 import { reportsRouter } from './modules/reports/reports.router.js'
+import { publicSettingsRouter, settingsRouter } from './modules/settings/settings.router.js'
 import { adminTablesRouter, tablesRouter } from './modules/tables/tables.router.js'
 import { wasteRouter } from './modules/waste/waste.router.js'
 
@@ -41,22 +47,34 @@ export function createApp(): Express {
   })
 
   // ── publik: dipakai halaman pelanggan, tanpa login ──
+  //
+  // requireFeature dipasang di sini, bukan di dalam tiap router, supaya tidak
+  // ada endpoint yang kelewat saat nanti ada yang ditambahkan. Menyembunyikan
+  // menunya di frontend saja tidak cukup — alamatnya tetap bisa dipanggil.
   app.use('/api/menus', publicMenusRouter)
   app.use('/api/orders', publicOrdersRouter)
-  app.use('/api/tables', tablesRouter)
+  app.use('/api/tables', requireFeature('modul.meja'), tablesRouter)
+  app.use('/api/reservations', requireFeature('modul.reservasi'), publicReservationsRouter)
+  app.use('/api/settings/public', publicSettingsRouter)
   app.use('/api/stream/orders', orderStreamRouter)
 
   // ── perlu login ──
   app.use('/api/auth', authRouter)
   app.use('/api/attachments', attachmentsRouter)
   app.use('/api/ingredients', ingredientsRouter)
-  app.use('/api/purchases', purchasesRouter)
-  app.use('/api/waste', wasteRouter)
-  app.use('/api/opname', opnameRouter)
-  app.use('/api/reports', reportsRouter)
+  app.use('/api/settings', settingsRouter)
+  app.use('/api/purchases', requireFeature('modul.pembelian'), purchasesRouter)
+  app.use('/api/waste', requireFeature('modul.waste'), wasteRouter)
+  app.use('/api/opname', requireFeature('modul.opname'), opnameRouter)
+  app.use('/api/reports', requireFeature('modul.laporan'), reportsRouter)
   app.use('/api/admin/menus', adminMenusRouter)
   app.use('/api/admin/orders', adminOrdersRouter)
-  app.use('/api/admin/tables', adminTablesRouter)
+  app.use('/api/admin/tables', requireFeature('modul.meja'), adminTablesRouter)
+  app.use(
+    '/api/admin/reservations',
+    requireFeature('modul.reservasi'),
+    adminReservationsRouter,
+  )
 
   app.use(notFoundHandler)
   app.use(errorHandler)

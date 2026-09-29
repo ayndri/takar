@@ -47,6 +47,11 @@ export default function TokoLayout({
                   </Link>
                 </li>
                 <li>
+                  <Link href="/reservasi" className="hover:text-ink">
+                    Pesan meja
+                  </Link>
+                </li>
+                <li>
                   <Link href="/pesanan" className="hover:text-ink">
                     Lacak pesanan
                   </Link>

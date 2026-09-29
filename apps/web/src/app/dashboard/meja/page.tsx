@@ -9,6 +9,7 @@ import { ApiError, request } from "@/lib/client-api";
 import { useOrigin } from "@/lib/origin";
 import { useSession } from "@/lib/session";
 import { useApi } from "@/lib/use-api";
+import { JagaModul } from "@/components/ui/fitur-mati";
 
 type Meja = {
   id: string;
@@ -18,7 +19,7 @@ type Meja = {
   path: string;
 };
 
-export default function MejaPage() {
+function IsiMejaPage() {
   const session = useSession();
   const pemilik = session?.user?.role === "OWNER";
 
@@ -320,5 +321,13 @@ export default function MejaPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function MejaPage() {
+  return (
+    <JagaModul kunci="modul.meja">
+      <IsiMejaPage />
+    </JagaModul>
   );
 }

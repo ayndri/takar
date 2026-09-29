@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest, conflict, insufficientStock, notFound } from '../../lib/errors.js'
+import { flagNyala } from '../settings/settings.service.js'
 import { requiredIngredients, type RecipeLine } from '../stock/stock-calculator.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
 import { orderEvents } from './orders.events.js'
@@ -28,6 +29,16 @@ const ORDER_INCLUDE = {
  * di confirmOrder() setelah baris stok dikunci.
  */
 export async function createOrder(input: CreateOrderInput) {
+  // Dua pengaturan toko diperiksa di sini, bukan cuma di tombolnya. Tombol
+  // yang disembunyikan tetap bisa dilewati dengan memanggil endpoint-nya.
+  if (!(await flagNyala('toko.pesananOnline'))) {
+    throw conflict('Kafe sedang tidak menerima pesanan online')
+  }
+
+  if (!input.tableId && (await flagNyala('toko.wajibMeja'))) {
+    throw badRequest('Pilih dulu nomor meja sebelum mengirim pesanan')
+  }
+
   const menuIds = [...new Set(input.items.map((i) => i.menuId))]
 
   const menus = await prisma.menu.findMany({

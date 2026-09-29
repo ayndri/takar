@@ -35,3 +35,7 @@ export const insufficientStock = (
     'INSUFFICIENT_STOCK',
     { shortages },
   )
+
+/// Dipakai saat modul yang diminta sedang dimatikan lewat halaman pengaturan.
+export const featureDisabled = (label: string) =>
+  new AppError(403, `${label} sedang dimatikan di pengaturan`, 'FEATURE_DISABLED')

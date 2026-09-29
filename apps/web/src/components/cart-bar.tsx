@@ -8,6 +8,7 @@ import { ApiError, formatRupiah, request } from "@/lib/client-api";
 import { simpanPesananTerakhir } from "@/lib/last-order";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
+import { usePengaturanPublik } from "@/lib/use-settings";
 
 type CafeTable = { id: string; number: string };
 
@@ -19,8 +20,18 @@ export function CartBar() {
   const router = useRouter();
   const cart = useCart();
   const { data: tables } = useApi<CafeTable[]>("/api/tables");
+  const pengaturan = usePengaturanPublik();
 
   const meja = useMeja();
+
+  // Kafe bisa menutup pesanan online (sedang tutup, dapur kewalahan) dan bisa
+  // mewajibkan nomor meja. Keduanya juga diperiksa ulang di server — yang di
+  // sini cuma supaya orang tidak mengetik seluruh pesanan lalu ditolak.
+  const menerimaPesanan =
+    !pengaturan.siap || pengaturan.nyala("toko.pesananOnline");
+  const pakaiMeja = !pengaturan.siap || pengaturan.nyala("modul.meja");
+  const mejaWajib = pengaturan.nyala("toko.wajibMeja");
+  const mejaKurang = mejaWajib && !meja.nilai;
 
   const [open, setOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -84,7 +95,11 @@ export function CartBar() {
             <p className="font-medium">
               {cart.count} item · {formatRupiah(cart.total)}
             </p>
-            <p className="text-muted">Bayar di kasir setelah pesanan siap</p>
+            <p className="text-muted">
+              {menerimaPesanan
+                ? "Bayar di kasir setelah pesanan siap"
+                : "Kafe sedang tidak menerima pesanan online"}
+            </p>
           </div>
           <button
             type="button"
@@ -172,22 +187,35 @@ export function CartBar() {
             </ul>
 
             <div className="mt-5 space-y-3 border-t border-border pt-4">
-              <label className="block text-sm">
-                <span className="text-muted">Nomor meja</span>
-                <span className="mt-1 block">
-                  <Select
-                    value={meja.nilai ?? ""}
-                    onChange={(e) => meja.pilih(e.target.value || null)}
-                  >
-                    <option value="">Bawa pulang / ambil sendiri</option>
-                    {(tables ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        Meja {t.number}
+              {pakaiMeja && (
+                <label className="block text-sm">
+                  <span className="text-muted">
+                    Nomor meja{mejaWajib ? "" : " (opsional)"}
+                  </span>
+                  <span className="mt-1 block">
+                    <Select
+                      value={meja.nilai ?? ""}
+                      onChange={(e) => meja.pilih(e.target.value || null)}
+                    >
+                      <option value="">
+                        {mejaWajib
+                          ? "Pilih meja…"
+                          : "Bawa pulang / ambil sendiri"}
                       </option>
-                    ))}
-                  </Select>
-                </span>
-              </label>
+                      {(tables ?? []).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          Meja {t.number}
+                        </option>
+                      ))}
+                    </Select>
+                  </span>
+                  {mejaKurang && (
+                    <span className="mt-1 block text-xs text-warning">
+                      Kafe ini mewajibkan nomor meja.
+                    </span>
+                  )}
+                </label>
+              )}
 
               <label className="block text-sm">
                 <span className="text-muted">Nama (opsional)</span>
@@ -224,10 +252,14 @@ export function CartBar() {
               <button
                 type="button"
                 onClick={kirimPesanan}
-                disabled={sending}
+                disabled={sending || !menerimaPesanan || mejaKurang}
                 className="rounded-xl bg-accent px-5 py-2.5 font-medium text-white hover:bg-accent-ink disabled:opacity-50"
               >
-                {sending ? "Mengirim…" : "Kirim ke dapur"}
+                {!menerimaPesanan
+                  ? "Sedang tutup"
+                  : sending
+                    ? "Mengirim…"
+                    : "Kirim ke dapur"}
               </button>
             </div>
           </div>

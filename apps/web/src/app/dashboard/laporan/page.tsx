@@ -2,6 +2,7 @@
 
 import { formatRupiah } from "@/lib/client-api";
 import { useApi } from "@/lib/use-api";
+import { JagaModul } from "@/components/ui/fitur-mati";
 
 type Sales = {
   orderCount: number;
@@ -47,7 +48,7 @@ const LABEL_ALASAN: Record<string, string> = {
   OTHER: "Lainnya",
 };
 
-export default function LaporanPage() {
+function IsiLaporanPage() {
   const penjualan = useApi<Sales>("/api/reports/sales");
   const pembuangan = useApi<Waste>("/api/reports/waste");
   const persediaan = useApi<Inventory>("/api/reports/inventory");
@@ -229,5 +230,13 @@ function Panel({
       <h2 className="mb-3 text-sm font-semibold">{judul}</h2>
       {children}
     </section>
+  );
+}
+
+export default function LaporanPage() {
+  return (
+    <JagaModul kunci="modul.laporan">
+      <IsiLaporanPage />
+    </JagaModul>
   );
 }

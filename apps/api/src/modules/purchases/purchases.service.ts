@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest, notFound } from '../../lib/errors.js'
+import { flagNyala } from '../settings/settings.service.js'
 import { toBaseQty, unitCostPerBase, weightedAverageCost } from '../stock/stock-calculator.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
 import { hitungBukti, kaitkan } from '../attachments/attachments.service.js'
@@ -35,7 +36,11 @@ export async function createPurchase(input: CreatePurchaseInput) {
 
   // Ini satu-satunya tempat uang keluar ke pihak luar. Tanpa foto notanya,
   // tidak ada yang bisa mencocokkan angka di sini dengan kenyataan.
-  if (input.attachmentIds.length === 0) {
+  //
+  // Bisa dimatikan lewat pengaturan, tapi bawaannya menyala dan sebaiknya
+  // tetap begitu — yang hilang bukan kenyamanan, melainkan satu-satunya cara
+  // memeriksa angka belanja tanpa bertanya ke orang yang mengetiknya.
+  if (input.attachmentIds.length === 0 && (await flagNyala('toko.wajibBuktiPembelian'))) {
     throw badRequest('Nota pembelian harus disertai foto bukti')
   }
 

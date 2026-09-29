@@ -9,6 +9,7 @@ import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { JagaModul } from "@/components/ui/fitur-mati";
 
 type Ingredient = {
   id: string;
@@ -34,7 +35,7 @@ type Opname = {
   }[];
 };
 
-export default function OpnamePage() {
+function IsiOpnamePage() {
   const session = useSession();
   const pemilik = session?.user?.role === "OWNER";
 
@@ -529,5 +530,13 @@ function RincianOpname({
         </p>
       )}
     </>
+  );
+}
+
+export default function OpnamePage() {
+  return (
+    <JagaModul kunci="modul.opname">
+      <IsiOpnamePage />
+    </JagaModul>
   );
 }

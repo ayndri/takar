@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js'
 import { notFound } from '../../lib/errors.js'
 import { maxPortions, menuCost, menuMargin, type RecipeLine } from '../stock/stock-calculator.js'
 import { getAvgCostMap, getStockMap } from '../stock/stock.service.js'
+import { flagNyala } from '../settings/settings.service.js'
 
 /**
  * Katalog untuk halaman pelanggan.
@@ -44,6 +45,17 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
     }),
   }
 
+  /**
+   * Kalau menu habis disembunyikan, halamannya tidak bisa dipotong di
+   * database: "habis" baru ketahuan setelah stok bahan dibandingkan dengan
+   * resep, dan itu terjadi di sini. Memotong lebih dulu menghasilkan halaman
+   * berisi tujuh menu padahal satu halaman muat dua belas.
+   *
+   * Jadi saat pengaturan itu menyala, seluruh menu yang cocok diambil dulu
+   * lalu dipotong di memori. Katalognya puluhan menu, bukan puluhan ribu.
+   */
+  const sembunyikanHabis = await flagNyala('toko.sembunyikanMenuHabis')
+
   const total = await prisma.menu.count({ where })
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const halaman = Math.min(page, pages)
@@ -53,8 +65,9 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
       where,
       include: { recipes: { select: { ingredientId: true, qty: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      skip: (halaman - 1) * pageSize,
-      take: pageSize,
+      ...(sembunyikanHabis
+        ? {}
+        : { skip: (halaman - 1) * pageSize, take: pageSize }),
     }),
     getStockMap(),
     // Dipakai untuk menandai menu terlaris. Hanya pesanan yang benar-benar
@@ -98,7 +111,21 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
     }
   })
 
-  return { items, total, page: halaman, pageSize, pages }
+  if (!sembunyikanHabis) {
+    return { items, total, page: halaman, pageSize, pages }
+  }
+
+  const tersedia = items.filter((m) => m.available)
+  const pagesTersedia = Math.max(1, Math.ceil(tersedia.length / pageSize))
+  const halamanTersedia = Math.min(page, pagesTersedia)
+
+  return {
+    items: tersedia.slice((halamanTersedia - 1) * pageSize, halamanTersedia * pageSize),
+    total: tersedia.length,
+    page: halamanTersedia,
+    pageSize,
+    pages: pagesTersedia,
+  }
 }
 
 /**

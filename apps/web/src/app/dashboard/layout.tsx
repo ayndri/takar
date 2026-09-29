@@ -5,19 +5,28 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { clearSession } from "@/lib/client-api";
 import { notifySessionChanged, useSession } from "@/lib/session";
+import { usePengaturan } from "@/lib/use-settings";
 
-type MenuItem = { href: string; label: string; ownerOnly?: boolean };
+type MenuItem = {
+  href: string;
+  label: string;
+  ownerOnly?: boolean;
+  /** Kunci pengaturan yang harus menyala supaya tautan ini muncul. */
+  fitur?: string;
+};
 
 const MENU: MenuItem[] = [
   { href: "/dashboard", label: "Ringkasan" },
   { href: "/dashboard/pesanan", label: "Pesanan" },
+  { href: "/dashboard/reservasi", label: "Reservasi", fitur: "modul.reservasi" },
   { href: "/dashboard/bahan", label: "Bahan baku" },
   { href: "/dashboard/menu", label: "Menu & resep", ownerOnly: true },
-  { href: "/dashboard/pembelian", label: "Pembelian" },
-  { href: "/dashboard/waste", label: "Waste" },
-  { href: "/dashboard/opname", label: "Opname" },
-  { href: "/dashboard/meja", label: "Meja & QR" },
-  { href: "/dashboard/laporan", label: "Laporan", ownerOnly: true },
+  { href: "/dashboard/pembelian", label: "Pembelian", fitur: "modul.pembelian" },
+  { href: "/dashboard/waste", label: "Waste", fitur: "modul.waste" },
+  { href: "/dashboard/opname", label: "Opname", fitur: "modul.opname" },
+  { href: "/dashboard/meja", label: "Meja & QR", fitur: "modul.meja" },
+  { href: "/dashboard/laporan", label: "Laporan", ownerOnly: true, fitur: "modul.laporan" },
+  { href: "/dashboard/pengaturan", label: "Pengaturan", ownerOnly: true },
 ];
 
 export default function DashboardLayout({
@@ -28,6 +37,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const session = useSession();
+  const pengaturan = usePengaturan();
 
   useEffect(() => {
     // Render pertama selalu tanpa sesi (server tidak punya localStorage),
@@ -40,7 +50,16 @@ export default function DashboardLayout({
   }
 
   const user = session.user;
-  const items = MENU.filter((m) => !m.ownerOnly || user?.role === "OWNER");
+
+  // Modul yang dimatikan hilang dari navigasi. Selama pengaturannya belum
+  // terbaca, semuanya ditampilkan dulu — menu yang berkedip hilang tiap kali
+  // pindah halaman lebih mengganggu daripada satu tautan yang telat hilang,
+  // dan halamannya sendiri tetap dijaga JagaModul.
+  const items = MENU.filter(
+    (m) =>
+      (!m.ownerOnly || user?.role === "OWNER") &&
+      (!m.fitur || pengaturan.isLoading || pengaturan.nyala(m.fitur)),
+  );
 
   return (
     <div className="flex min-h-full flex-col">

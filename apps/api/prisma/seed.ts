@@ -257,6 +257,10 @@ const HARI_RIWAYAT = 14
 async function main() {
   console.log('Menghapus data lama...')
   await prisma.stockMovement.deleteMany()
+  // Bukti foto menunjuk ke user yang mengunggahnya, jadi harus lebih dulu
+  // hilang daripada usernya. Kalau tidak, seed ulang gagal begitu ada satu
+  // nota yang pernah diunggah lewat aplikasi.
+  await prisma.attachment.deleteMany()
   await prisma.opnameItem.deleteMany()
   await prisma.stockOpname.deleteMany()
   await prisma.wasteLog.deleteMany()
@@ -269,7 +273,9 @@ async function main() {
   await prisma.ingredientStock.deleteMany()
   await prisma.purchaseUnit.deleteMany()
   await prisma.ingredient.deleteMany()
+  await prisma.reservation.deleteMany()
   await prisma.cafeTable.deleteMany()
+  await prisma.setting.deleteMany()
   await prisma.user.deleteMany()
 
   console.log('Membuat user & meja...')
@@ -283,11 +289,17 @@ async function main() {
     }),
   ])
 
+  // Denah meja kafe kecil: banyak meja dua orang di depan, beberapa meja
+  // empat orang, dua meja panjang untuk rombongan. Campurannya sengaja tidak
+  // rata supaya pemilihan meja otomatis di reservasi ada yang diuji.
+  const KAPASITAS = [2, 2, 2, 2, 4, 4, 4, 4, 6, 6, 8, 8]
+
   const tables = await Promise.all(
     Array.from({ length: 12 }, (_, i) =>
       prisma.cafeTable.create({
         data: {
           number: String(i + 1),
+          capacity: KAPASITAS[i]!,
           // Acak penuh, bukan pola berisi nomor meja: kalau tokennya bisa
           // ditebak, QR di meja kehilangan gunanya.
           qrToken: randomBytes(9).toString('base64url'),
@@ -828,8 +840,144 @@ async function main() {
     return !cache.equals(new Decimal((row._sum.qty ?? 0).toString()))
   })
 
+  console.log('Membuat reservasi contoh...')
+
+  /**
+   * Reservasi meja: tujuh hari ke belakang dan tujuh hari ke depan.
+   *
+   * Jamnya jam dinding kafe (WIB), sama seperti yang dipakai aplikasi. Ditulis
+   * langsung dengan Date.UTC + offset, bukan lewat zona waktu sistem, supaya
+   * hasil seed sama persis di laptop mana pun.
+   */
+  const ZONA_MENIT = 7 * 60
+  const DURASI_MENIT = 90
+
+  const waktuKafe = (hariDariIni: number, jam: number, menit: number) => {
+    const nol = new Date()
+    nol.setUTCHours(0, 0, 0, 0)
+    const wib = new Date(nol.getTime() + ZONA_MENIT * 60_000)
+
+    return new Date(
+      Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), wib.getUTCDate() + hariDariIni) +
+        (jam * 60 + menit - ZONA_MENIT) * 60_000,
+    )
+  }
+
+  const NAMA_TAMU = [
+    'Rani Puspita',
+    'Bagas Wicaksono',
+    'Ayu Lestari',
+    'Fajar Nugroho',
+    'Nadia Salsabila',
+    'Reza Alfarizi',
+    'Kirana Dewi',
+    'Yoga Pratama',
+    'Intan Maharani',
+    'Dimas Saputra',
+    'Salma Azzahra',
+    'Ilham Ramadhan',
+  ] as const
+
+  const CATATAN_RESERVASI = [
+    'Rombongan ulang tahun, tolong meja dekat jendela',
+    'Bawa anak kecil, butuh kursi tinggi',
+    null,
+    null,
+    'Meeting, kalau bisa yang agak sepi',
+    null,
+  ] as const
+
+  const ALASAN_BATAL = ['Tamu berhalangan', 'Ganti hari', null] as const
+
+  type StatusReservasi = 'PENDING' | 'CONFIRMED' | 'SEATED' | 'DONE' | 'CANCELLED' | 'NO_SHOW'
+
+  const reservasi: {
+    code: string
+    tableId: string
+    customerName: string
+    phone: string
+    guestCount: number
+    startAt: Date
+    endAt: Date
+    status: StatusReservasi
+    note: string | null
+    confirmedAt: Date | null
+    seatedAt: Date | null
+    cancelledAt: Date | null
+    cancelReason: string | null
+  }[] = []
+
+  /** Menjaga seed tidak membuat dua reservasi bertumpuk di meja yang sama. */
+  const slotTerpakai = new Set<string>()
+  let nomorKode = 0
+
+  for (let hari = -7; hari <= 7; hari++) {
+    const banyaknya = acakAntara(1, 4)
+
+    for (let n = 0; n < banyaknya; n++) {
+      const jamMulai = acakAntara(10, 19)
+      const menitMulai = acak() < 0.5 ? 0 : 30
+      const jumlahTamu = acakAntara(1, 8)
+
+      const muat = tables.filter(
+        (t) =>
+          t.capacity >= jumlahTamu &&
+          !slotTerpakai.has(`${t.id}|${hari}|${jamMulai}|${menitMulai}`),
+      )
+      if (muat.length === 0) continue
+
+      // Meja terkecil yang masih muat — aturan yang sama dengan aplikasinya.
+      const meja = muat.reduce((a, b) => (b.capacity < a.capacity ? b : a))
+      slotTerpakai.add(`${meja.id}|${hari}|${jamMulai}|${menitMulai}`)
+
+      const startAt = waktuKafe(hari, jamMulai, menitMulai)
+      const endAt = new Date(startAt.getTime() + DURASI_MENIT * 60_000)
+
+      // Yang sudah lewat punya akhir cerita, yang akan datang belum.
+      const undi = acak()
+      const status: StatusReservasi =
+        hari < 0
+          ? undi < 0.75
+            ? 'DONE'
+            : undi < 0.9
+              ? 'NO_SHOW'
+              : 'CANCELLED'
+          : undi < 0.55
+            ? 'CONFIRMED'
+            : undi < 0.85
+              ? 'PENDING'
+              : 'CANCELLED'
+
+      const dibuat = new Date(startAt.getTime() - acakAntara(2, 72) * 60 * 60_000)
+
+      nomorKode += 1
+      reservasi.push({
+        code: `RSV-${nomorKode.toString(16).toUpperCase().padStart(4, '0')}`,
+        tableId: meja.id,
+        customerName: pilih(NAMA_TAMU),
+        phone: `08${acakAntara(11, 89)}${acakAntara(10000000, 99999999)}`,
+        guestCount: jumlahTamu,
+        startAt,
+        endAt,
+        status,
+        note: pilih(CATATAN_RESERVASI),
+        confirmedAt: status === 'PENDING' ? null : dibuat,
+        seatedAt: status === 'DONE' ? startAt : null,
+        cancelledAt: status === 'CANCELLED' ? dibuat : null,
+        cancelReason: status === 'CANCELLED' ? pilih(ALASAN_BATAL) : null,
+      })
+    }
+  }
+
+  await prisma.reservation.createMany({ data: reservasi })
+
+  // Tabel `settings` sengaja dibiarkan kosong. Nilai bawaannya ada di
+  // settings.catalog.ts, dan baris baru ditulis hanya saat pemilik mengubah
+  // sesuatu — jadi tabel kosong memang keadaan yang benar setelah seed.
+
+
   console.log('\nSelesai.')
-  console.log(`  ${BAHAN.length} bahan · ${MENU.length} menu · ${tables.length} meja`)
+  console.log(`  ${BAHAN.length} bahan · ${MENU.length} menu · ${tables.length} meja · ${reservasi.length} reservasi`)
   console.log(`  ${jumlahPesanan} pesanan (${jumlahBatal} dibatalkan) · ${gerakan.length} pergerakan stok`)
   console.log(`  cache vs ledger: ${meleset.length === 0 ? 'cocok semua' : `${meleset.length} MELESET`}`)
   console.log('  Login owner : owner@takar.test / takar1234')

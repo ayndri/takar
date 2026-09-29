@@ -57,6 +57,15 @@ enum WasteReason {
   OTHER
 }
 
+enum ReservationStatus {
+  PENDING // pelanggan sudah kirim, kafe belum konfirmasi
+  CONFIRMED // meja dipesan atas namanya
+  SEATED // tamu datang dan sudah duduk
+  DONE
+  CANCELLED
+  NO_SHOW // lewat jam mulai tapi tamu tidak datang
+}
+
 // ─────────────────────────── master ───────────────────────────
 
 model User {
@@ -169,7 +178,12 @@ model CafeTable {
   qrToken  String  @unique @map("qr_token")
   isActive Boolean @default(true) @map("is_active")
 
-  orders Order[]
+  /// Berapa orang yang muat. Dipakai reservasi untuk menyaring meja yang
+  /// terlalu kecil, dan supaya rombongan enam orang tidak kebagian meja dua.
+  capacity Int @default(4)
+
+  orders       Order[]
+  reservations Reservation[]
 
   @@map("tables")
 }
@@ -372,4 +386,73 @@ model StockMovement {
   @@index([ingredientId, createdAt])
   @@index([refType, refId])
   @@map("stock_movements")
+}
+
+// ─────────────────────────── reservasi ───────────────────────────
+
+/// Pemesanan meja untuk jam tertentu.
+///
+/// Dua hal yang perlu diketahui saat membaca ini:
+///
+///  1. `endAt` disimpan, bukan dihitung dari durasi saat query. Cek bentrok
+///     jadi satu kondisi biasa yang bisa memakai indeks
+///     (`startAt < lawan.endAt AND endAt > lawan.startAt`). Kalau durasi cuma
+///     ada di pengaturan, mengubah pengaturan itu diam-diam menggeser semua
+///     reservasi lama yang sudah terlanjur dijanjikan ke tamu.
+///
+///  2. Reservasi tidak menyentuh stok sama sekali. Yang direbutkan di sini
+///     adalah meja pada rentang waktu, bukan bahan.
+model Reservation {
+  id String @id @default(uuid())
+
+  /// Kode pendek yang dipakai tamu untuk melihat status: RSV-3C91.
+  code String @unique
+
+  /// Boleh kosong selama masih PENDING — kafe yang menentukan mejanya saat
+  /// konfirmasi kalau tamu tidak memilih sendiri.
+  tableId String?    @map("table_id")
+  table   CafeTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  customerName String @map("customer_name")
+  phone        String
+  guestCount   Int    @map("guest_count")
+
+  startAt DateTime @map("start_at")
+  endAt   DateTime @map("end_at")
+
+  status ReservationStatus @default(PENDING)
+  note   String?
+
+  confirmedAt  DateTime? @map("confirmed_at")
+  seatedAt     DateTime? @map("seated_at")
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelReason String?   @map("cancel_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([startAt, status])
+  @@index([tableId, startAt])
+  @@map("reservations")
+}
+
+// ─────────────────────────── pengaturan ───────────────────────────
+
+/// Pengaturan aplikasi, satu baris per kunci.
+///
+/// Daftar kunci yang sah beserta nilai bawaannya ada di kode
+/// (`modules/settings/settings.catalog.ts`), bukan di tabel ini. Tabel ini
+/// hanya menyimpan yang sudah pernah diubah dari bawaannya. Akibatnya
+/// menambah pengaturan baru cukup satu baris di katalog, tanpa migrasi, dan
+/// pemasangan baru langsung jalan dengan tabel kosong.
+///
+/// Nilainya selalu teks. Penafsirannya (boolean, angka, jam) ditentukan
+/// katalog, supaya tabelnya tidak perlu satu kolom per tipe.
+model Setting {
+  key   String @id
+  value String
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }

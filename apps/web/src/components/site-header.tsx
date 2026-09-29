@@ -8,10 +8,19 @@ import { Select } from "@/components/select";
 import { useCart } from "@/lib/cart";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
+import { usePengaturanPublik } from "@/lib/use-settings";
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  /** Kunci pengaturan yang harus menyala supaya tautan ini muncul. */
+  fitur?: string;
+};
+
+const NAV: NavItem[] = [
   { href: "/", label: "Beranda" },
   { href: "/menu", label: "Menu" },
+  { href: "/reservasi", label: "Reservasi", fitur: "modul.reservasi" },
   { href: "/pesanan", label: "Pesanan" },
 ];
 
@@ -23,7 +32,16 @@ export function SiteHeader() {
   const { count } = useCart();
   const meja = useMeja();
   const { data: tables } = useApi<CafeTable[]>("/api/tables");
+  const pengaturan = usePengaturanPublik();
   const [kata, setKata] = useState("");
+
+  // Sebelum pengaturannya terbaca, tautan bersyarat disembunyikan. Di header
+  // yang tampil di tiap halaman, tautan yang muncul lalu hilang lagi lebih
+  // terasa mengganggu daripada tautan yang telat sepersekian detik.
+  const nav = NAV.filter((item) => !item.fitur || pengaturan.nyala(item.fitur));
+
+  // Kafe yang hanya melayani bawa pulang tidak punya nomor meja untuk dipilih.
+  const pakaiMeja = !pengaturan.siap || pengaturan.nyala("modul.meja");
 
   const nomorMeja = tables?.find((t) => t.id === meja.nilai)?.number;
 
@@ -38,7 +56,11 @@ export function SiteHeader() {
         </Link>
 
         {/* Pengganti "antar ke alamat": di kafe yang menentukan adalah mejanya. */}
-        <label className="hidden shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface py-1.5 pr-2 pl-2.5 text-sm md:flex">
+        <label
+          className={`shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface py-1.5 pr-2 pl-2.5 text-sm ${
+            pakaiMeja ? "hidden md:flex" : "hidden"
+          }`}
+        >
           <IconMeja className="size-4 text-accent" />
           <span className="sr-only">Nomor meja</span>
           <Select
@@ -75,7 +97,7 @@ export function SiteHeader() {
         </form>
 
         <nav className="ml-auto hidden gap-1 sm:flex">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 

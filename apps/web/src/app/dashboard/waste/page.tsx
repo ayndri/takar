@@ -15,6 +15,7 @@ import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { JagaModul } from "@/components/ui/fitur-mati";
 
 type Ingredient = { id: string; name: string; baseUnit: string };
 
@@ -42,7 +43,7 @@ const LABEL_ALASAN = Object.fromEntries(
   ALASAN.map((a) => [a.value, a.label]),
 ) as Record<string, string>;
 
-export default function WastePage() {
+function IsiWastePage() {
   const session = useSession();
   const pemilik = session?.user?.role === "OWNER";
 
@@ -358,5 +359,13 @@ export default function WastePage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function WastePage() {
+  return (
+    <JagaModul kunci="modul.waste">
+      <IsiWastePage />
+    </JagaModul>
   );
 }

@@ -14,6 +14,7 @@ import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { JagaModul } from "@/components/ui/fitur-mati";
 
 type Ingredient = {
   id: string;
@@ -53,7 +54,7 @@ const BARIS_KOSONG: Baris = {
   unitPrice: "",
 };
 
-export default function PembelianPage() {
+function IsiPembelianPage() {
   const bahan = useApi<Ingredient[]>("/api/ingredients");
   const nota = useApi<Purchase[]>("/api/purchases");
 
@@ -583,5 +584,13 @@ function RincianNota({ nota }: { nota: Purchase }) {
         resep.
       </p>
     </>
+  );
+}
+
+export default function PembelianPage() {
+  return (
+    <JagaModul kunci="modul.pembelian">
+      <IsiPembelianPage />
+    </JagaModul>
   );
 }
