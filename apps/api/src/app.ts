@@ -96,3 +96,18 @@ export function createApp(): Express {
 
   return app
 }
+
+/**
+ * Instance siap pakai, diekspor sebagai default.
+ *
+ * Hosting serverless mengimpor modul ini lalu memanggil ekspor default-nya
+ * dengan (req, res) — tidak ada port yang dibuka dan tidak ada yang memanggil
+ * createApp() untuknya. Aplikasi Express kebetulan sudah berbentuk fungsi
+ * (req, res), jadi cukup diekspor apa adanya.
+ *
+ * createApp() tetap diekspor terpisah supaya test bisa membuat instance
+ * sendiri yang bersih lewat supertest, tanpa ikut memakai yang ini.
+ */
+const app = createApp()
+
+export default app
