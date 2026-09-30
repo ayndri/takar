@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHead } from "@/components/ui/toolbar";
 import { ApiError, request } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
+import { SkeletonSakelar } from "@/components/ui/skeleton";
 import {
   usePengaturan,
   type SettingGrup,
@@ -129,7 +130,7 @@ export default function PengaturanPage() {
         deskripsi="Matikan yang tidak dipakai. Modul yang dimatikan hilang dari menu dan endpoint-nya ikut ditolak — datanya tetap utuh."
       />
 
-      {isLoading && <p className="text-muted">Memuat pengaturan…</p>}
+      {isLoading && <SkeletonSakelar />}
 
       <div className="space-y-6">
         {URUTAN_GRUP.map((grup) => {

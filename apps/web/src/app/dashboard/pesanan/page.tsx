@@ -9,6 +9,7 @@ import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { SkeletonPapan } from "@/components/ui/skeleton";
 
 type Order = {
   id: string;
@@ -241,9 +242,7 @@ export default function PesananPage() {
         </div>
       )}
 
-      {isLoading && (
-        <p className="mb-4 text-sm text-muted">Memuat papan pesanan…</p>
-      )}
+      {isLoading && <SkeletonPapan />}
 
       <div className="grid gap-4 lg:grid-cols-4">
         {KOLOM.map((kolom) => {

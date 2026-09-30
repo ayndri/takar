@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatRupiah } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useApi } from "@/lib/use-api";
+import { SkeletonBaris } from "@/components/ui/skeleton";
 
 type Ringkasan = {
   hariIni: { pesanan: number; omzet?: string };
@@ -154,7 +155,7 @@ export default function RingkasanPage() {
           aksi={{ label: "Catat pembelian", href: "/dashboard/pembelian" }}
         >
           {isLoading ? (
-            <p className="text-sm text-muted">Memuat…</p>
+            <SkeletonBaris jumlah={4} />
           ) : data && data.stok.daftarMenipis.length > 0 ? (
             <ul className="space-y-2 text-sm">
               {data.stok.daftarMenipis.map((b) => (
@@ -180,7 +181,7 @@ export default function RingkasanPage() {
             aksi={{ label: "Lihat laporan", href: "/dashboard/laporan" }}
           >
             {isLoading ? (
-              <p className="text-sm text-muted">Memuat…</p>
+              <SkeletonBaris jumlah={4} />
             ) : data?.mingguIni && data.mingguIni.menuTeratas.length > 0 ? (
               <ul className="space-y-2 text-sm">
                 {data.mingguIni.menuTeratas.map((m) => (

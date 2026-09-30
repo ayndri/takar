@@ -16,6 +16,7 @@ import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 import { JagaModul } from "@/components/ui/fitur-mati";
+import { SkeletonTabel } from "@/components/ui/skeleton";
 
 type Ingredient = { id: string; name: string; baseUnit: string };
 
@@ -284,11 +285,7 @@ function IsiWastePage() {
           </thead>
           <tbody>
             {riwayat.isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                  Memuat catatan…
-                </td>
-              </tr>
+              <SkeletonTabel baris={5} kolom={6} />
             )}
 
             {!riwayat.isLoading && tabel.items.length === 0 && (

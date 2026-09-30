@@ -11,6 +11,7 @@ import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { SkeletonTabel } from "@/components/ui/skeleton";
 
 type MenuPromo = {
   id: string;
@@ -290,11 +291,7 @@ function IsiPromo() {
             </thead>
             <tbody>
               {menus.isLoading && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                    Memuat menu…
-                  </td>
-                </tr>
+                <SkeletonTabel baris={5} kolom={6} />
               )}
 
               {!menus.isLoading && tabel.items.length === 0 && (

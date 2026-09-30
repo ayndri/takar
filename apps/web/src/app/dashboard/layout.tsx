@@ -5,6 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { clearSession } from "@/lib/client-api";
 import { notifySessionChanged, useSession } from "@/lib/session";
+import {
+  Skeleton,
+  SkeletonJudul,
+  SkeletonStat,
+} from "@/components/ui/skeleton";
 import { usePengaturan } from "@/lib/use-settings";
 
 type MenuItem = {
@@ -47,7 +52,29 @@ export default function DashboardLayout({
   }, [session, router]);
 
   if (!session) {
-    return <p className="p-8 text-muted">Memeriksa sesi…</p>;
+    // Render pertama selalu tanpa sesi, jadi layar ini pasti terlihat sekejap
+    // oleh semua orang yang membuka dasbor. Rangka header membuat kedipannya
+    // tidak terasa seperti halaman yang salah muat.
+    return (
+      <div role="status" aria-busy="true" className="flex min-h-full flex-col">
+        <span className="sr-only">Memeriksa sesi…</span>
+        <header className="border-b border-border bg-surface">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-7 w-40" />
+          </div>
+          <div className="mx-auto flex max-w-6xl gap-2 px-4 pb-2 sm:px-6">
+            {Array.from({ length: 6 }, (_, i) => (
+              <Skeleton key={i} className="h-7 w-20" />
+            ))}
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+          <SkeletonJudul />
+          <SkeletonStat />
+        </main>
+      </div>
+    );
   }
 
   const user = session.user;

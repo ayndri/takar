@@ -8,6 +8,7 @@ import { PageHead, SearchBox, TablePager } from "@/components/ui/toolbar";
 import { ApiError, formatRupiah, request } from "@/lib/client-api";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { SkeletonTabel } from "@/components/ui/skeleton";
 
 type MenuRow = {
   id: string;
@@ -168,11 +169,7 @@ export default function MenuPage() {
 
           <tbody>
             {isLoading && (
-              <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted">
-                  Memuat daftar menu…
-                </td>
-              </tr>
+              <SkeletonTabel baris={5} kolom={7} />
             )}
 
             {!isLoading && tabel.items.length === 0 && (

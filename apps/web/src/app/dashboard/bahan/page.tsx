@@ -9,6 +9,7 @@ import { formatRupiah, formatWaktu } from "@/lib/client-api";
 import { useSession } from "@/lib/session";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
+import { SkeletonTabel } from "@/components/ui/skeleton";
 
 type Ingredient = {
   id: string;
@@ -180,11 +181,7 @@ export default function BahanPage() {
 
           <tbody>
             {isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                  Memuat daftar bahan…
-                </td>
-              </tr>
+              <SkeletonTabel baris={5} kolom={6} />
             )}
 
             {!isLoading && tabel.items.length === 0 && (

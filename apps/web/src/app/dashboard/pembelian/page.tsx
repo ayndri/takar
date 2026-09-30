@@ -15,6 +15,7 @@ import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { useTable } from "@/lib/use-table";
 import { useApi } from "@/lib/use-api";
 import { JagaModul } from "@/components/ui/fitur-mati";
+import { SkeletonTabel } from "@/components/ui/skeleton";
 
 type Ingredient = {
   id: string;
@@ -237,11 +238,7 @@ function IsiPembelianPage() {
           </thead>
           <tbody>
             {nota.isLoading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                  Memuat nota…
-                </td>
-              </tr>
+              <SkeletonTabel baris={5} kolom={6} />
             )}
 
             {!nota.isLoading && tabel.items.length === 0 && (
