@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest, conflict, insufficientStock, notFound } from '../../lib/errors.js'
+import { hargaBerlaku } from '../menus/menu-pricing.js'
 import { flagNyala } from '../settings/settings.service.js'
 import { requiredIngredients, type RecipeLine } from '../stock/stock-calculator.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
@@ -52,10 +53,23 @@ export async function createOrder(input: CreateOrderInput) {
 
   const menuById = new Map(menus.map((m) => [m.id, m]))
 
-  // Harga disalin dari database, bukan dari yang dikirim browser.
+  /**
+   * Harga yang dipakai selalu diambil dari database, bukan dari yang dikirim
+   * browser — dan kalau menunya sedang promo, yang berlaku harga promonya.
+   *
+   * Dihitung sekali di sini lalu dipakai untuk total dan untuk tiap baris,
+   * supaya keduanya tidak mungkin memakai angka yang berbeda kalau promonya
+   * kebetulan berakhir di tengah proses.
+   */
+  const promoNyala = await flagNyala('modul.promo')
+  const sekarang = new Date()
+
+  const hargaPakai = new Map(
+    menus.map((m) => [m.id, hargaBerlaku(promoNyala ? m : { price: m.price }, sekarang)]),
+  )
+
   const total = input.items.reduce((sum, item) => {
-    const menu = menuById.get(item.menuId)!
-    return sum.plus(new Decimal(menu.price.toString()).mul(item.qty))
+    return sum.plus(hargaPakai.get(item.menuId)!.mul(item.qty))
   }, new Decimal(0))
 
   const order = await prisma.order.create({
@@ -69,7 +83,7 @@ export async function createOrder(input: CreateOrderInput) {
         create: input.items.map((item) => ({
           menuId: item.menuId,
           qty: item.qty,
-          unitPrice: menuById.get(item.menuId)!.price,
+          unitPrice: hargaPakai.get(item.menuId)!.toFixed(2),
           note: item.note ?? null,
         })),
       },

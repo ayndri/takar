@@ -21,6 +21,7 @@ const MENU: MenuItem[] = [
   { href: "/dashboard/reservasi", label: "Reservasi", fitur: "modul.reservasi" },
   { href: "/dashboard/bahan", label: "Bahan baku" },
   { href: "/dashboard/menu", label: "Menu & resep", ownerOnly: true },
+  { href: "/dashboard/promo", label: "Promo", fitur: "modul.promo" },
   { href: "/dashboard/pembelian", label: "Pembelian", fitur: "modul.pembelian" },
   { href: "/dashboard/waste", label: "Waste", fitur: "modul.waste" },
   { href: "/dashboard/opname", label: "Opname", fitur: "modul.opname" },

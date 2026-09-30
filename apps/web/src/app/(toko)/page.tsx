@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ActiveOrderBar } from "@/components/active-order-bar";
+import { BannerPengumuman } from "@/components/banner-pengumuman";
 import {
   IconCatatan,
   IconJam,
@@ -13,7 +14,12 @@ import { HeroSearch } from "@/components/hero-search";
 import { MenuCard } from "@/components/menu-card";
 import { PilihanUtama } from "@/components/pilihan-utama";
 import { Takaran } from "@/components/takaran";
-import { formatRupiah, getHighlights, type Highlights } from "@/lib/api";
+import {
+  formatRupiah,
+  getHighlights,
+  getPengumuman,
+  type Highlights,
+} from "@/lib/api";
 import { urutkanKategori } from "@/lib/kategori";
 
 // Beranda memuat sisa porsi yang berubah tiap pesanan masuk.
@@ -76,6 +82,9 @@ export default async function BerandaPage() {
     gagal = true;
   }
 
+  // Diambil terpisah supaya banner yang gagal tidak ikut menjatuhkan beranda.
+  const pengumuman = await getPengumuman();
+
   const stats = data?.stats ?? {
     total: 0,
     available: 0,
@@ -106,6 +115,8 @@ export default async function BerandaPage() {
 
   return (
     <main>
+      {pengumuman && <BannerPengumuman pengumuman={pengumuman} />}
+
       {/* ── hero ──
           Fotonya tidak lagi ditutup lapisan putih. Teks berdiri di kolomnya
           sendiri di atas latar bersih, foto mendapat kolom penuh di sebelahnya,

@@ -146,6 +146,17 @@ model Menu {
   imageUrl String? @map("image_url")
   isActive Boolean @default(true) @map("is_active")
 
+  /// Harga promo. Kosong berarti tidak sedang promo.
+  ///
+  /// Sengaja kolom terpisah, bukan menimpa `price`. Promo yang mengubah harga
+  /// aslinya membuat angka yang dicoret di halaman pelanggan hilang, dan
+  /// mengembalikan harga normal setelah promo selesai jadi bergantung pada
+  /// ingatan orang. Dengan begini harga kembali sendiri saat rentangnya lewat.
+  promoPrice    Decimal?  @map("promo_price") @db.Decimal(14, 2)
+  /// Kosong berarti "berlaku sejak kapan pun" / "sampai dilepas".
+  promoStartsAt DateTime? @map("promo_starts_at")
+  promoEndsAt   DateTime? @map("promo_ends_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -455,4 +466,39 @@ model Setting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// ─────────────────────────── promo ───────────────────────────
+
+/// Pengumuman yang tampil di beranda pelanggan.
+///
+/// Isinya bebas — "Gratis kopi kedua tiap Jumat", "Buka sampai tengah malam
+/// selama Ramadan". Tidak menyentuh harga sama sekali; potongan harga ada di
+/// kolom promo milik Menu.
+///
+/// Yang tampil cuma satu: yang terbaru di antara yang aktif dan rentang
+/// waktunya sedang berjalan. Beberapa pengumuman bertumpuk di beranda malah
+/// tidak ada yang terbaca.
+model Announcement {
+  id String @id @default(uuid())
+
+  title String
+  body  String
+
+  /// Tautan opsional, mis. ke satu menu atau ke halaman reservasi.
+  linkLabel String? @map("link_label")
+  linkHref  String? @map("link_href")
+
+  /// Kosong berarti tanpa batas di sisi itu.
+  startsAt DateTime? @map("starts_at")
+  endsAt   DateTime? @map("ends_at")
+
+  /// Dimatikan tanpa dihapus, supaya pengumuman musiman bisa dipakai lagi.
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, startsAt])
+  @@map("announcements")
 }

@@ -8,13 +8,15 @@ import {
   validateParams,
   validateQuery,
 } from '../../middleware/validate.js'
-import { createMenuSchema, idParamSchema, updateMenuSchema } from './menus.schema.js'
+import { createMenuSchema, idParamSchema, promoSchema,
+  updateMenuSchema } from './menus.schema.js'
 import {
   createMenu,
   getHighlights,
   getMenu,
   listMenusForOwner,
   listPublicMenus,
+  setPromo,
   updateMenu,
 } from './menus.service.js'
 
@@ -62,5 +64,14 @@ adminMenusRouter.patch(
   validateBody(updateMenuSchema),
   async (req, res) => {
     res.json(await updateMenu(getParams<{ id: string }>(res).id, req.body))
+  },
+)
+
+adminMenusRouter.post(
+  '/:id/promo',
+  validateParams(idParamSchema),
+  validateBody(promoSchema),
+  async (req, res) => {
+    res.json(await setPromo(getParams<{ id: string }>(res).id, req.body))
   },
 )

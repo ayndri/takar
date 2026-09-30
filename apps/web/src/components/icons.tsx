@@ -83,3 +83,37 @@ export function IconMeja({ className = "" }: Props) {
     </svg>
   );
 }
+
+/**
+ * Api kecil untuk menandai menu terlaris.
+ *
+ * Bentuk api dipilih karena sudah jadi bahasa umum untuk "sedang ramai" —
+ * bintang sudah dipakai di mana-mana untuk penilaian, dan ini bukan penilaian
+ * melainkan hitungan penjualan tujuh hari terakhir.
+ */
+export function IconApi({ className = "" }: Props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.6" className={`${base} ${className}`}>
+      <path
+        d="M12 3c.6 2.6 2.3 3.7 3.6 5.3A6.9 6.9 0 0 1 17.3 13a5.3 5.3 0 0 1-10.6 0c0-1.6.6-2.8 1.4-3.8.3 1 .9 1.7 1.7 2 .1-2.9.8-5.5 2.2-8.2Z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Label harga untuk menandai potongan harga.
+ * Lubang di kirinya yang membuatnya terbaca sebagai label gantung, bukan kotak.
+ */
+export function IconPromo({ className = "" }: Props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.6" className={`${base} ${className}`}>
+      <path
+        d="M3.5 11.4V4.8a1.3 1.3 0 0 1 1.3-1.3h6.6c.3 0 .7.2.9.4l8 8a1.3 1.3 0 0 1 0 1.9l-6.6 6.6a1.3 1.3 0 0 1-1.9 0l-8-8a1.3 1.3 0 0 1-.3-1Z"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.8" cy="7.8" r="1.4" />
+    </svg>
+  );
+}

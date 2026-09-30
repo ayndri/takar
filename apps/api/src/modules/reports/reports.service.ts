@@ -2,6 +2,8 @@ import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { menuCost, menuMargin, type RecipeLine } from '../stock/stock-calculator.js'
 import { getAvgCostMap } from '../stock/stock.service.js'
+import { hargaBerlaku } from '../menus/menu-pricing.js'
+import { flagNyala } from '../settings/settings.service.js'
 
 type Range = { from?: string; to?: string }
 
@@ -292,6 +294,9 @@ export async function menuMargins() {
     getAvgCostMap(),
   ])
 
+  const promoNyala = await flagNyala('modul.promo')
+  const sekarang = new Date()
+
   return menus
     .map((menu) => {
       const recipe: RecipeLine[] = menu.recipes.map((r) => ({
@@ -300,13 +305,19 @@ export async function menuMargins() {
       }))
 
       const cost = menuCost(recipe, avgCost)
-      const { profit, percent } = menuMargin(menu.price.toString(), cost)
+
+      // Margin dihitung terhadap harga yang benar-benar berlaku hari ini.
+      // Menu yang sedang dipotong 30% punya margin yang jauh berbeda dari
+      // harga normalnya, dan itu justru yang perlu dilihat pemilik.
+      const efektif = hargaBerlaku(promoNyala ? menu : { price: menu.price }, sekarang)
+      const { profit, percent } = menuMargin(efektif.toString(), cost)
 
       return {
         menuId: menu.id,
         name: menu.name,
         category: menu.category,
-        price: menu.price.toString(),
+        price: efektif.toFixed(2),
+        normalPrice: efektif.equals(menu.price.toString()) ? null : menu.price.toString(),
         cost: cost.toFixed(2),
         profit: profit.toFixed(2),
         marginPercent: percent.toFixed(1),

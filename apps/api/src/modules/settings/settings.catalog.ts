@@ -90,6 +90,16 @@ export const SETTINGS: readonly SettingDef[] = [
     publik: true,
   },
   {
+    kunci: 'modul.promo',
+    grup: 'modul',
+    tipe: 'boolean',
+    bawaan: 'true',
+    label: 'Promo & pengumuman',
+    keterangan:
+      'Harga promo per menu dan banner pengumuman di beranda. Dimatikan berarti harga kembali normal seketika — promo yang sudah tersimpan tidak dihapus, cuma berhenti berlaku.',
+    publik: true,
+  },
+  {
     kunci: 'modul.reservasi',
     grup: 'modul',
     tipe: 'boolean',

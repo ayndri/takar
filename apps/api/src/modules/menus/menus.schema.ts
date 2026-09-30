@@ -20,6 +20,20 @@ export const updateMenuSchema = createMenuSchema
     isActive: z.boolean().optional(),
   })
 
+/**
+ * Promo dipisah dari updateMenu karena bentuk pekerjaannya beda: mengubah
+ * resep itu menata dapur, memasang promo itu keputusan harga. Menggabungkan
+ * keduanya berarti tiap kali pemilik memasang diskon, seluruh resep ikut
+ * ditulis ulang.
+ *
+ * promoPrice bernilai null berarti promonya dilepas.
+ */
+export const promoSchema = z.object({
+  promoPrice: z.number().positive('Harga promo harus lebih dari nol').nullable(),
+  promoStartsAt: z.iso.datetime().nullish(),
+  promoEndsAt: z.iso.datetime().nullish(),
+})
+
 export const idParamSchema = z.object({
   id: z.uuid('ID tidak valid'),
 })

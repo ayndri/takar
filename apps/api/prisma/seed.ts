@@ -273,6 +273,7 @@ async function main() {
   await prisma.ingredientStock.deleteMany()
   await prisma.purchaseUnit.deleteMany()
   await prisma.ingredient.deleteMany()
+  await prisma.announcement.deleteMany()
   await prisma.reservation.deleteMany()
   await prisma.cafeTable.deleteMany()
   await prisma.setting.deleteMany()
@@ -976,8 +977,68 @@ async function main() {
   // sesuatu — jadi tabel kosong memang keadaan yang benar setelah seed.
 
 
+  console.log('Memasang promo & pengumuman contoh...')
+
+  /**
+   * Promo contoh: satu yang sedang berjalan tanpa batas waktu, satu yang
+   * berakhir akhir pekan ini, dan satu yang baru mulai besok. Ketiganya
+   * dipilih supaya tiga keadaan berbeda kelihatan sekaligus di dasbor —
+   * sedang jalan, akan berakhir, dan belum mulai.
+   */
+  const saatIni = new Date()
+  const tambahHariPromo = (n: number) =>
+    new Date(saatIni.getTime() + n * 24 * 60 * 60 * 1000)
+
+  const PROMO: { nama: string; potongan: number; mulai?: Date; selesai?: Date }[] = [
+    { nama: MENU[3]!.name, potongan: 0.2 },
+    { nama: MENU[7]!.name, potongan: 0.15, selesai: tambahHariPromo(3) },
+    { nama: MENU[12]!.name, potongan: 0.25, mulai: tambahHariPromo(1), selesai: tambahHariPromo(8) },
+  ]
+
+  let jumlahPromo = 0
+  for (const p of PROMO) {
+    const id = menuId.get(p.nama)
+    const menu = MENU.find((m) => m.name === p.nama)
+    if (!id || !menu) continue
+
+    // Dibulatkan ke lima ratus terdekat — harga kafe tidak pernah Rp 22.383.
+    const promo = Math.round((menu.price * (1 - p.potongan)) / 500) * 500
+
+    await prisma.menu.update({
+      where: { id },
+      data: {
+        promoPrice: promo,
+        promoStartsAt: p.mulai ?? null,
+        promoEndsAt: p.selesai ?? null,
+      },
+    })
+    jumlahPromo += 1
+  }
+
+  await prisma.announcement.createMany({
+    data: [
+      {
+        title: 'Kopi kedua setengah harga',
+        body: 'Tiap Jumat mulai pukul 15.00 sampai tutup, untuk pesanan di tempat.',
+        linkLabel: 'Lihat kopinya',
+        linkHref: '/menu?category=Kopi',
+        isActive: true,
+      },
+      {
+        // Sengaja dimatikan: supaya terlihat bahwa pengumuman musiman bisa
+        // disimpan dan dinyalakan lagi tanpa diketik ulang.
+        title: 'Buka sampai tengah malam',
+        body: 'Selama libur akhir tahun, dapur tutup pukul 23.30.',
+        linkLabel: null,
+        linkHref: null,
+        isActive: false,
+      },
+    ],
+  })
+
+
   console.log('\nSelesai.')
-  console.log(`  ${BAHAN.length} bahan · ${MENU.length} menu · ${tables.length} meja · ${reservasi.length} reservasi`)
+  console.log(`  ${BAHAN.length} bahan · ${MENU.length} menu · ${tables.length} meja · ${reservasi.length} reservasi · ${jumlahPromo} promo`)
   console.log(`  ${jumlahPesanan} pesanan (${jumlahBatal} dibatalkan) · ${gerakan.length} pergerakan stok`)
   console.log(`  cache vs ledger: ${meleset.length === 0 ? 'cocok semua' : `${meleset.length} MELESET`}`)
   console.log('  Login owner : owner@takar.test / takar1234')

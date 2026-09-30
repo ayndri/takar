@@ -2,12 +2,40 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { IconApi } from "@/components/icons";
 import { Takaran } from "@/components/takaran";
 import { useCart } from "@/lib/cart";
 import { formatRupiah } from "@/lib/client-api";
 import type { PublicMenu } from "@/lib/api";
 
 const AMBANG_MENIPIS = 5;
+
+/**
+ * Harga, dengan angka lama dicoret saat sedang promo.
+ *
+ * Yang dicoret ditaruh sesudah harga baru, bukan sebelum: yang perlu dibaca
+ * duluan adalah jumlah yang benar-benar dibayar.
+ */
+function Harga({ menu }: { menu: PublicMenu }) {
+  if (menu.normalPrice === null) {
+    return (
+      <span className="text-sm font-medium tabular-nums">
+        {formatRupiah(menu.price)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-1.5">
+      <span className="text-sm font-semibold text-danger tabular-nums">
+        {formatRupiah(menu.price)}
+      </span>
+      <span className="text-xs text-muted line-through tabular-nums">
+        {formatRupiah(menu.normalPrice)}
+      </span>
+    </span>
+  );
+}
 
 /**
  * Kartu menu dipakai di beranda dan katalog.
@@ -58,9 +86,25 @@ export function MenuCard({
             </div>
           )}
 
-          {peringkat && !habis && (
-            <span className="absolute top-3 left-3 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white">
-              {peringkat}
+          {/* Tanda terlaris menang atas label peringkat: keduanya di sudut yang
+              sama, dan "Terlaris" dengan ikon lebih jelas daripada teks saja. */}
+          {menu.isBestSeller && !habis ? (
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-lg bg-accent px-2 py-1 text-xs font-medium text-white">
+              <IconApi className="size-3.5" aria-hidden="true" />
+              Terlaris
+            </span>
+          ) : (
+            peringkat &&
+            !habis && (
+              <span className="absolute top-3 left-3 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white">
+                {peringkat}
+              </span>
+            )
+          )}
+
+          {menu.discountPercent !== null && !habis && (
+            <span className="absolute bottom-3 left-3 rounded-lg bg-danger px-2 py-1 text-xs font-semibold text-white">
+              −{menu.discountPercent}%
             </span>
           )}
 
@@ -98,14 +142,10 @@ export function MenuCard({
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-3">
           {ringkas || habis ? (
-            <span className="text-sm font-medium tabular-nums">
-              {formatRupiah(menu.price)}
-            </span>
+            <Harga menu={menu} />
           ) : (
             <div>
-              <span className="text-sm font-medium tabular-nums">
-                {formatRupiah(menu.price)}
-              </span>
+              <Harga menu={menu} />
               <div className="mt-1.5">
                 <Takaran sisa={menu.remainingPortions} />
               </div>

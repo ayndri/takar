@@ -1,9 +1,59 @@
 import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
-import { notFound } from '../../lib/errors.js'
+import { badRequest, notFound } from '../../lib/errors.js'
 import { maxPortions, menuCost, menuMargin, type RecipeLine } from '../stock/stock-calculator.js'
 import { getAvgCostMap, getStockMap } from '../stock/stock.service.js'
 import { flagNyala } from '../settings/settings.service.js'
+import {
+  alasanPromoDitolak,
+  hargaBerlaku,
+  potonganPersen,
+  type PromoMenu,
+} from './menu-pricing.js'
+
+/** Status pesanan yang benar-benar terjadi — dipakai menghitung penjualan. */
+const STATUS_TERJUAL = ['CONFIRMED', 'PREPARING', 'READY', 'DONE'] as const
+
+/**
+ * Tiga menu terlaris minggu ini.
+ *
+ * Dihitung terpisah dari angka penjualan per halaman katalog, dan memang
+ * harus begitu: "terlaris" itu peringkat terhadap **seluruh** menu, bukan
+ * terhadap dua belas yang kebetulan tampil di halaman yang sedang dibuka.
+ * Kalau dihitung per halaman, tiap halaman punya juaranya sendiri dan
+ * tandanya kehilangan arti.
+ */
+async function idTerlaris(sejak: Date, berapa = 3): Promise<Set<string>> {
+  const rows = await prisma.orderItem.groupBy({
+    by: ['menuId'],
+    _sum: { qty: true },
+    where: {
+      order: { status: { in: [...STATUS_TERJUAL] }, confirmedAt: { gte: sejak } },
+    },
+    orderBy: { _sum: { qty: 'desc' } },
+    take: berapa,
+  })
+
+  return new Set(rows.map((r) => r.menuId))
+}
+
+/**
+ * Bagian harga yang dilihat pelanggan.
+ *
+ * `price` selalu harga yang benar-benar dibayar saat ini, jadi keranjang dan
+ * total pesanan tidak perlu tahu-menahu soal promo. `normalPrice` cuma diisi
+ * saat sedang promo — itu angka yang dicoret di kartu menu.
+ */
+function bagianHarga(menu: PromoMenu, promoNyala: boolean, sekarang: Date) {
+  const dipakai = promoNyala ? menu : { price: menu.price }
+  const potongan = potonganPersen(dipakai, sekarang)
+
+  return {
+    price: hargaBerlaku(dipakai, sekarang).toFixed(2),
+    normalPrice: potongan === null ? null : new Decimal(menu.price.toString()).toFixed(2),
+    discountPercent: potongan,
+  }
+}
 
 /**
  * Katalog untuk halaman pelanggan.
@@ -55,6 +105,9 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
    * lalu dipotong di memori. Katalognya puluhan menu, bukan puluhan ribu.
    */
   const sembunyikanHabis = await flagNyala('toko.sembunyikanMenuHabis')
+  const promoNyala = await flagNyala('modul.promo')
+  const terlaris = await idTerlaris(semingguLalu)
+  const sekarang = new Date()
 
   const total = await prisma.menu.count({ where })
   const pages = Math.max(1, Math.ceil(total / pageSize))
@@ -101,12 +154,13 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
       id: menu.id,
       name: menu.name,
       category: menu.category,
-      price: menu.price.toString(),
+      ...bagianHarga(menu, promoNyala, sekarang),
       imageUrl: menu.imageUrl,
       available: portions > 0,
       // Ditampilkan sebagai "tinggal 3 porsi" saat menipis.
       remainingPortions: portions,
       soldThisWeek: terjualPerMenu.get(menu.id) ?? 0,
+      isBestSeller: terlaris.has(menu.id),
       ingredientCount: menu.recipes.length,
     }
   })
@@ -165,6 +219,10 @@ export async function getHighlights() {
     terjual.map((row) => [row.menuId, row._sum.qty ?? 0]),
   )
 
+  const promoNyala = await flagNyala('modul.promo')
+  const terlaris = await idTerlaris(semingguLalu)
+  const sekarang = new Date()
+
   const lengkap = menus.map((menu) => {
     const recipe: RecipeLine[] = menu.recipes.map((r) => ({
       ingredientId: r.ingredientId,
@@ -176,11 +234,12 @@ export async function getHighlights() {
       id: menu.id,
       name: menu.name,
       category: menu.category,
-      price: menu.price.toString(),
+      ...bagianHarga(menu, promoNyala, sekarang),
       imageUrl: menu.imageUrl,
       available: portions > 0,
       remainingPortions: portions,
       soldThisWeek: terjualPerMenu.get(menu.id) ?? 0,
+      isBestSeller: terlaris.has(menu.id),
       ingredientCount: menu.recipes.length,
     }
   })
@@ -204,11 +263,19 @@ export async function getHighlights() {
       .filter((m) => m.remainingPortions <= 5)
       .sort((a, b) => a.remainingPortions - b.remainingPortions)
       .slice(0, 5),
+    /** Menu yang sedang potong harga, potongan terbesar lebih dulu. */
+    promos: tersedia
+      .filter((m) => m.discountPercent !== null)
+      .sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0))
+      .slice(0, 8),
   }
 }
 
 /** Versi untuk dashboard: ikut membawa HPP dan margin. */
 export async function listMenusForOwner() {
+  const promoNyala = await flagNyala('modul.promo')
+  const sekarang = new Date()
+
   const [menus, stock, avgCost] = await Promise.all([
     prisma.menu.findMany({
       include: {
@@ -233,13 +300,23 @@ export async function listMenusForOwner() {
     }))
 
     const cost = menuCost(recipe, avgCost)
-    const { profit, percent } = menuMargin(menu.price.toString(), cost)
+
+    // Margin dihitung terhadap harga yang benar-benar berlaku hari ini.
+    // Menampilkan margin harga normal saat menunya sedang dipotong 30% itu
+    // angka yang enak dilihat tapi bukan yang sedang terjadi.
+    const efektif = hargaBerlaku(promoNyala ? menu : { price: menu.price }, sekarang)
+    const { profit, percent } = menuMargin(efektif.toString(), cost)
 
     return {
       id: menu.id,
       name: menu.name,
       category: menu.category,
       price: menu.price.toString(),
+      promoPrice: menu.promoPrice?.toString() ?? null,
+      promoStartsAt: menu.promoStartsAt,
+      promoEndsAt: menu.promoEndsAt,
+      /** Harga yang dibayar pelanggan hari ini — sama dengan price kalau tidak promo. */
+      effectivePrice: efektif.toFixed(2),
       imageUrl: menu.imageUrl,
       isActive: menu.isActive,
       remainingPortions: maxPortions(recipe, stock),
@@ -279,6 +356,7 @@ export async function getMenu(id: string) {
   if (!menu) throw notFound('Menu tidak ditemukan')
 
   const stock = await getStockMap()
+  const promoNyala = await flagNyala('modul.promo')
   const recipe: RecipeLine[] = menu.recipes.map((r) => ({
     ingredientId: r.ingredientId,
     qty: r.qty.toString(),
@@ -288,7 +366,7 @@ export async function getMenu(id: string) {
     id: menu.id,
     name: menu.name,
     category: menu.category,
-    price: menu.price.toString(),
+    ...bagianHarga(menu, promoNyala, new Date()),
     imageUrl: menu.imageUrl,
     isActive: menu.isActive,
     remainingPortions: maxPortions(recipe, stock),
@@ -360,4 +438,72 @@ export async function updateMenu(
       include: { recipes: true },
     })
   })
+}
+
+/**
+ * Pasang atau lepas promo sebuah menu.
+ *
+ * Harga normalnya tidak disentuh sama sekali — yang diubah cuma kolom promo,
+ * jadi begitu rentangnya lewat atau promonya dilepas, harga kembali sendiri.
+ */
+export async function setPromo(
+  id: string,
+  input: {
+    promoPrice: number | null
+    promoStartsAt?: string | null
+    promoEndsAt?: string | null
+  },
+) {
+  const menu = await prisma.menu.findUnique({
+    where: { id },
+    select: { id: true, price: true },
+  })
+
+  if (!menu) throw notFound('Menu tidak ditemukan')
+
+  const mulai = input.promoStartsAt ? new Date(input.promoStartsAt) : null
+  const selesai = input.promoEndsAt ? new Date(input.promoEndsAt) : null
+
+  const ditolak = alasanPromoDitolak({
+    price: menu.price.toString(),
+    promoPrice: input.promoPrice,
+    promoStartsAt: mulai,
+    promoEndsAt: selesai,
+  })
+
+  if (ditolak) throw badRequest(ditolak)
+
+  const lepas = input.promoPrice === null
+
+  const hasil = await prisma.menu.update({
+    where: { id },
+    data: {
+      promoPrice: lepas ? null : new Decimal(input.promoPrice!).toFixed(2),
+      // Tanggalnya ikut dibersihkan saat promo dilepas, supaya tidak ada
+      // sisa jadwal yang membingungkan saat promo berikutnya dipasang.
+      promoStartsAt: lepas ? null : mulai,
+      promoEndsAt: lepas ? null : selesai,
+    },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      promoPrice: true,
+      promoStartsAt: true,
+      promoEndsAt: true,
+    },
+  })
+
+  const sekarang = new Date()
+
+  return {
+    id: hasil.id,
+    name: hasil.name,
+    price: hasil.price.toString(),
+    promoPrice: hasil.promoPrice?.toString() ?? null,
+    promoStartsAt: hasil.promoStartsAt,
+    promoEndsAt: hasil.promoEndsAt,
+    effectivePrice: hargaBerlaku(hasil, sekarang).toFixed(2),
+    discountPercent: potonganPersen(hasil, sekarang),
+  }
 }

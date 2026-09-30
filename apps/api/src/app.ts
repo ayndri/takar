@@ -7,6 +7,10 @@ import { prisma } from './lib/prisma.js'
 import { requireFeature } from './middleware/feature.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js'
 import { attachmentsRouter } from './modules/attachments/attachments.router.js'
+import {
+  adminAnnouncementsRouter,
+  publicAnnouncementsRouter,
+} from './modules/announcements/announcements.router.js'
 import { authRouter } from './modules/auth/auth.router.js'
 import { ingredientsRouter } from './modules/ingredients/ingredients.router.js'
 import { adminMenusRouter, publicMenusRouter } from './modules/menus/menus.router.js'
@@ -71,6 +75,7 @@ export function createApp(): Express {
   app.use('/api/tables', requireFeature('modul.meja'), tablesRouter)
   app.use('/api/reservations', requireFeature('modul.reservasi'), publicReservationsRouter)
   app.use('/api/settings/public', publicSettingsRouter)
+  app.use('/api/announcements', requireFeature('modul.promo'), publicAnnouncementsRouter)
   app.use('/api/stream/orders', orderStreamRouter)
 
   // ── perlu login ──
@@ -85,6 +90,11 @@ export function createApp(): Express {
   app.use('/api/admin/menus', adminMenusRouter)
   app.use('/api/admin/orders', adminOrdersRouter)
   app.use('/api/admin/tables', requireFeature('modul.meja'), adminTablesRouter)
+  app.use(
+    '/api/admin/announcements',
+    requireFeature('modul.promo'),
+    adminAnnouncementsRouter,
+  )
   app.use(
     '/api/admin/reservations',
     requireFeature('modul.reservasi'),
