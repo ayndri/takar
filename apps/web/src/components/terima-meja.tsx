@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { IconMeja } from "@/components/icons";
-import { useMeja } from "@/lib/meja";
+import { simpanTokenMeja, useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
 
 type Meja = { id: string; number: string };
@@ -30,8 +30,13 @@ export function TerimaMeja({ token }: { token: string }) {
 
     sudah.current = true;
     meja.pilih(data.id);
+
+    // Tokennya ikut disimpan, bukan dibuang setelah ditukar. Ini satu-satunya
+    // bukti bahwa perangkat ini pernah berada di meja tersebut, dan halaman
+    // lacak memakainya untuk menampilkan pesanan meja ini tanpa scan ulang.
+    simpanTokenMeja(token);
     router.replace("/menu?meja=terpasang");
-  }, [data, meja, router]);
+  }, [data, meja, router, token]);
 
   if (error) {
     return (

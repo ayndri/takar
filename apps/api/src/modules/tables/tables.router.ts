@@ -66,6 +66,64 @@ tablesRouter.get(
   },
 )
 
+/**
+ * Pesanan yang sedang berjalan di satu meja.
+ *
+ * Kuncinya token QR, bukan nomor meja — dan itu bukan kerumitan yang
+ * berlebihan. Nomor meja tercetak di mejanya dan terlihat seisi ruangan;
+ * kalau nomor yang jadi kunci, siapa pun bisa mengetik 1 sampai 12 lalu
+ * memanen nama dan pesanan semua tamu sekaligus. Token QR tidak bisa
+ * ditebak, dan yang memindainya sudah pasti duduk di meja itu.
+ *
+ * Yang dikembalikan sengaja ringkas: cukup untuk mengenali mana pesanan
+ * sendiri, lalu membukanya lewat kodenya seperti biasa.
+ */
+tablesRouter.get(
+  '/by-token/:token/orders',
+  validateParams(z.object({ token: z.string().min(4).max(64) })),
+  async (_req, res) => {
+    const token = getParams<{ token: string }>(res).token
+
+    const table = await prisma.cafeTable.findUnique({
+      where: { qrToken: token },
+      select: { id: true, number: true, isActive: true },
+    })
+
+    if (!table?.isActive) throw notFound('Meja tidak ditemukan')
+
+    // Hanya yang belum tuntas. Pesanan kemarin yang sudah selesai bukan
+    // urusan orang yang baru duduk di meja itu hari ini.
+    const orders = await prisma.order.findMany({
+      where: {
+        tableId: table.id,
+        status: { in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        code: true,
+        status: true,
+        total: true,
+        customerName: true,
+        createdAt: true,
+        _count: { select: { items: true } },
+      },
+    })
+
+    res.json({
+      table: { number: table.number },
+      orders: orders.map((o) => ({
+        code: o.code,
+        status: o.status,
+        total: o.total.toString(),
+        customerName: o.customerName,
+        createdAt: o.createdAt,
+        itemCount: o._count.items,
+      })),
+    })
+  },
+)
+
 /** Pengelolaan meja dan QR-nya. Hanya untuk staff. */
 export const adminTablesRouter = Router()
 
