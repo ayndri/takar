@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
 import { muatSnap } from "@/lib/snap";
 import { useApi } from "@/lib/use-api";
@@ -60,6 +60,13 @@ const KABAR_BAYAR: Record<string, { teks: string; nada: "tunggu" | "aman" | "gag
 export function OrderStatus({ code }: { code: string }) {
   const [sibukBayar, setSibukBayar] = useState(false);
   const [galatBayar, setGalatBayar] = useState<string | null>(null);
+
+  /**
+   * Penjaga supaya popup tidak dibuka dua kali bersamaan. Snap menolak
+   * panggilan kedua saat popupnya masih terbuka, dan penolakan itu muncul
+   * sebagai "gagal membuka" padahal tidak ada yang gagal.
+   */
+  const popupTerbuka = useRef(false);
   // Pelanggan cuma melihat satu pesanan, jadi polling ringan sudah cukup —
   // tidak perlu buka koneksi SSE seperti layar dapur.
   const { data: order, error, mutate } = useApi<Order>(`/api/orders/${code}`, {
@@ -76,6 +83,8 @@ export function OrderStatus({ code }: { code: string }) {
    * selamanya.
    */
   async function bayar() {
+    if (popupTerbuka.current) return;
+
     setSibukBayar(true);
     setGalatBayar(null);
 
@@ -97,12 +106,21 @@ export function OrderStatus({ code }: { code: string }) {
 
       const snap = await muatSnap(bayar.clientKey, bayar.produksi);
 
+      popupTerbuka.current = true;
+
+      const tutup = () => {
+        popupTerbuka.current = false;
+        void mutate();
+      };
+
       snap.pay(bayar.snapToken, {
-        onSuccess: () => void mutate(),
-        onPending: () => void mutate(),
-        onClose: () => void mutate(),
+        onSuccess: tutup,
+        onPending: tutup,
+        onError: tutup,
+        onClose: tutup,
       });
     } catch (e) {
+      popupTerbuka.current = false;
       setGalatBayar(
         e instanceof ApiError ? e.message : "Gagal membuka halaman pembayaran",
       );
@@ -110,6 +128,39 @@ export function OrderStatus({ code }: { code: string }) {
       setSibukBayar(false);
     }
   }
+
+  /**
+   * Buka popup sekali saja begitu tamu mendarat di sini dari keranjang.
+   *
+   * Ditandai di sessionStorage per kode pesanan, bukan sekadar di memori:
+   * tanpa itu, menyegarkan halaman membuka popup lagi, dan tamu yang sengaja
+   * menutupnya untuk membaca rincian pesanannya jadi terjebak.
+   */
+  useEffect(() => {
+    if (!order || order.paymentMethod !== "ONLINE") return;
+    if (order.status !== "PENDING") return;
+
+    const bayaran = order.payments[0];
+    if (bayaran && bayaran.status !== "PENDING") return;
+
+    const kunci = `takar.bayar.${code}`;
+
+    try {
+      if (sessionStorage.getItem(kunci)) return;
+      sessionStorage.setItem(kunci, "1");
+    } catch {
+      // Storage diblokir — popup tidak dibuka otomatis, tombolnya tetap ada.
+      return;
+    }
+
+    // Ditunda satu microtask supaya perubahan state di dalam bayar() terjadi
+    // setelah render ini selesai, bukan di tengah-tengahnya.
+    queueMicrotask(() => void bayar());
+    // Sengaja hanya bergantung pada kode pesanan dan keadaan yang menentukan:
+    // `order` berubah tiap kali polling membawa data baru, dan efek ini
+    // memang cuma boleh jalan sekali.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, order?.paymentMethod, order?.status]);
 
   if (error) {
     return (
@@ -137,6 +188,12 @@ export function OrderStatus({ code }: { code: string }) {
     order.status === "PENDING" &&
     (!bayaran || ["PENDING", "FAILED", "EXPIRED", "CANCELLED"].includes(bayaran.status));
 
+  /**
+   * Selama belum dibayar, garis waktunya belum berjalan sama sekali —
+   * diredupkan supaya tidak terbaca seperti pesanan yang sudah masuk antrean.
+   */
+  const belumDibayar = order.paymentMethod === "ONLINE" && perluBayar;
+
   return (
     <div className="mt-6">
       <p className="text-sm text-muted">Kode pesanan</p>
@@ -149,42 +206,6 @@ export function OrderStatus({ code }: { code: string }) {
         {order.customerName ? ` · ${order.customerName}` : ""} ·{" "}
         {formatWaktu(order.createdAt)}
       </p>
-
-      {dibatalkan ? (
-        <div className="mt-6 rounded-xl border border-border bg-surface p-5">
-          <p className="font-medium text-danger">Pesanan dibatalkan</p>
-          {order.note && <p className="mt-1 text-sm text-muted">{order.note}</p>}
-        </div>
-      ) : (
-        <ol className="mt-6 space-y-1">
-          {TAHAPAN.map((tahap, i) => {
-            const lewat = i < currentIndex;
-            const aktif = i === currentIndex;
-
-            return (
-              <li key={tahap.status} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <span
-                    className={`mt-1 size-2.5 rounded-full ${
-                      lewat || aktif ? "bg-accent" : "bg-border"
-                    }`}
-                  />
-                  {i < TAHAPAN.length - 1 && (
-                    <span
-                      className={`w-px flex-1 ${lewat ? "bg-accent" : "bg-border"}`}
-                    />
-                  )}
-                </div>
-
-                <div className={`pb-5 ${aktif ? "" : "opacity-60"}`}>
-                  <p className="font-medium">{tahap.label}</p>
-                  <p className="text-sm text-muted">{tahap.detail}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
 
       {order.paymentMethod === "ONLINE" && (
         <div
@@ -222,6 +243,48 @@ export function OrderStatus({ code }: { code: string }) {
             </button>
           )}
         </div>
+      )}
+
+      {dibatalkan ? (
+        <div className="mt-6 rounded-xl border border-border bg-surface p-5">
+          <p className="font-medium text-danger">Pesanan dibatalkan</p>
+          {order.note && <p className="mt-1 text-sm text-muted">{order.note}</p>}
+        </div>
+      ) : (
+        <ol className={`mt-6 space-y-1 ${belumDibayar ? "opacity-50" : ""}`}>
+          {TAHAPAN.map((tahap, i) => {
+            const lewat = i < currentIndex;
+            const aktif = i === currentIndex;
+
+            return (
+              <li key={tahap.status} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`mt-1 size-2.5 rounded-full ${
+                      lewat || aktif ? "bg-accent" : "bg-border"
+                    }`}
+                  />
+                  {i < TAHAPAN.length - 1 && (
+                    <span
+                      className={`w-px flex-1 ${lewat ? "bg-accent" : "bg-border"}`}
+                    />
+                  )}
+                </div>
+
+                <div className={`pb-5 ${aktif ? "" : "opacity-60"}`}>
+                  <p className="font-medium">{tahap.label}</p>
+                  <p className="text-sm text-muted">{tahap.detail}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      {belumDibayar && (
+        <p className="-mt-2 mb-2 text-sm text-muted">
+          Pesanan baru masuk antrean dapur setelah pembayaranmu diterima.
+        </p>
       )}
 
       <div className="mt-2 rounded-xl border border-border bg-surface p-4">

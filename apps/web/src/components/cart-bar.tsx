@@ -8,7 +8,6 @@ import { ApiError, formatRupiah, request } from "@/lib/client-api";
 import { simpanPesananTerakhir } from "@/lib/last-order";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
-import { muatSnap } from "@/lib/snap";
 import { usePengaturanPublik } from "@/lib/use-settings";
 
 type CafeTable = { id: string; number: string };
@@ -90,44 +89,22 @@ export function CartBar() {
       simpanPesananTerakhir(order.code);
       setOpen(false);
 
-      if (pilihan === "ONLINE") {
-        // Popup dibuka dari sini, bukan dari halaman status: kalau tamu
-        // menutupnya, dia mendarat di halaman statusnya yang sudah punya
-        // tombol "Bayar sekarang" untuk mencoba lagi.
-        await bukaPembayaran(order.code);
-      }
-
+      /**
+       * Popup pembayaran TIDAK dibuka dari sini.
+       *
+       * Sempat dicoba begitu, dan hasilnya kacau: popup terbuka lalu halaman
+       * di bawahnya berpindah, jadi tamu melihat popup mengambang di atas
+       * halaman yang baru saja berganti — dan percobaan bayar kedua dari
+       * halaman itu bertabrakan dengan popup yang masih terbuka.
+       *
+       * Sekarang satu tempat saja yang memegang popup: halaman status.
+       */
       router.push(`/pesanan/${order.code}`);
     } catch (e) {
       setError(
         e instanceof ApiError ? e.message : "Pesanan gagal dikirim, coba lagi",
       );
       setSending(false);
-    }
-  }
-
-  /**
-   * Minta token Snap lalu buka popupnya.
-   *
-   * Kegagalan di sini sengaja tidak membatalkan pesanannya. Pesanannya sudah
-   * tersimpan dan sah; yang gagal cuma pembayarannya, dan itu bisa diulang
-   * dari halaman status tanpa mengetik ulang seluruh pesanan.
-   */
-  async function bukaPembayaran(kode: string) {
-    try {
-      const bayar = await request<{
-        snapToken: string | null;
-        clientKey: string;
-        produksi: boolean;
-      }>(`/api/payments/${kode}/snap`, { method: "POST" });
-
-      if (!bayar.snapToken) return;
-
-      const snap = await muatSnap(bayar.clientKey, bayar.produksi);
-      snap.pay(bayar.snapToken, {});
-    } catch {
-      // Ditelan dengan sengaja — halaman status yang akan menjelaskan
-      // keadaannya, lengkap dengan tombol untuk mencoba lagi.
     }
   }
 
