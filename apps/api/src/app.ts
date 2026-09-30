@@ -46,6 +46,47 @@ const helmet = ((helmetModule as unknown as { default?: unknown }).default ??
   helmetModule) as (options?: HelmetOptions) => RequestHandler
 
 /**
+ * Alamat yang boleh memanggil API ini, dari CORS_ORIGIN.
+ *
+ * Garis miring di ujung dibuang. Header `Origin` yang dikirim browser tidak
+ * pernah berakhiran garis miring, jadi CORS_ORIGIN yang terlanjur ditulis
+ * "https://kafe.vercel.app/" tidak akan pernah cocok — dan gejalanya cuma
+ * "CORS error" di konsol browser, tanpa satu pun tanda di sisi server.
+ */
+const asalDiizinkan = env.CORS_ORIGIN.split(',')
+  .map((s) => s.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+
+/**
+ * Penentu boleh-tidaknya sebuah asal.
+ *
+ * Dibuat sebagai fungsi, bukan sekadar daftar, supaya penolakannya bisa
+ * dicatat. Tanpa catatan ini, salah ketik satu huruf di CORS_ORIGIN
+ * menghasilkan kegagalan yang cuma terlihat di browser orang lain.
+ */
+function izinkanAsal(
+  origin: string | undefined,
+  cb: (err: Error | null, boleh?: boolean) => void,
+) {
+  // Permintaan tanpa Origin — curl, health check, panggilan antar server —
+  // tidak tunduk pada aturan CORS sama sekali.
+  if (!origin) return cb(null, true)
+
+  if (asalDiizinkan.includes(origin.replace(/\/+$/, ''))) return cb(null, true)
+
+  console.warn(
+    `CORS menolak asal "${origin}". Yang diizinkan: ${
+      asalDiizinkan.join(', ') || '(CORS_ORIGIN kosong)'
+    }`,
+  )
+
+  // false, bukan error: balasannya tetap dikirim, cuma tanpa izin CORS.
+  // Melempar error di sini membuat permintaan jadi 500 dan menyembunyikan
+  // sebab sebenarnya.
+  cb(null, false)
+}
+
+/**
  * Dipisah dari server.ts supaya test bisa memakai instance ini
  * lewat supertest tanpa membuka port.
  */
@@ -53,7 +94,7 @@ export function createApp(): Express {
   const app = express()
 
   app.use(helmet())
-  app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((s) => s.trim()) }))
+  app.use(cors({ origin: izinkanAsal }))
   app.use(express.json({ limit: '1mb' }))
 
   if (env.NODE_ENV !== 'test') {
