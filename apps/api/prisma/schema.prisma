@@ -57,6 +57,23 @@ enum WasteReason {
   OTHER
 }
 
+enum PaymentMethod {
+  CASHIER // bayar di kasir setelah pesanan siap
+  ONLINE // bayar lebih dulu lewat Midtrans
+}
+
+enum PaymentStatus {
+  PENDING // tamu sudah membuka halaman bayar, belum selesai
+  PAID
+  FAILED
+  EXPIRED // tidak dibayar sampai batas waktunya
+  CANCELLED
+  /// Sudah dibayar, tapi bahannya ternyata tidak cukup saat mau dipotong.
+  /// Uangnya harus dikembalikan, dan itu pekerjaan manusia — sistem cuma
+  /// memastikan tidak ada yang luput dari perhatian.
+  REFUND_NEEDED
+}
+
 enum ReservationStatus {
   PENDING // pelanggan sudah kirim, kafe belum konfirmasi
   CONFIRMED // meja dipesan atas namanya
@@ -214,6 +231,9 @@ model Order {
   total        Decimal     @db.Decimal(14, 2)
   note         String?
 
+  /// Bayar di kasir atau bayar duluan lewat Midtrans.
+  paymentMethod PaymentMethod @default(CASHIER) @map("payment_method")
+
   /// Diisi saat status masuk CONFIRMED — penanda stok sudah dipotong.
   confirmedAt DateTime? @map("confirmed_at")
   cancelledAt DateTime? @map("cancelled_at")
@@ -221,7 +241,8 @@ model Order {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items OrderItem[]
+  items    OrderItem[]
+  payments Payment[]
 
   @@index([status, createdAt])
   @@map("orders")
@@ -501,4 +522,53 @@ model Announcement {
 
   @@index([isActive, startsAt])
   @@map("announcements")
+}
+
+// ─────────────────────────── pembayaran ───────────────────────────
+
+/// Satu percobaan pembayaran.
+///
+/// Tabel terpisah, bukan kolom di Order, karena satu pesanan bisa dibayar
+/// beberapa kali: percobaan pertama kedaluwarsa, tamu mencoba lagi dengan
+/// cara lain. Kalau statusnya ditempel di Order, percobaan yang gagal
+/// tertimpa dan tidak ada lagi jejak kenapa tamu sempat kesulitan.
+///
+/// Isi notifikasi terakhir disimpan apa adanya. Kalau nanti ada sengketa
+/// soal uang, yang menyelesaikan adalah apa yang benar-benar dikirim
+/// Midtrans, bukan tafsiran kita atasnya.
+model Payment {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider String @default("midtrans")
+
+  /// order_id yang dikirim ke Midtrans. Harus unik per percobaan — Midtrans
+  /// menolak order_id yang sudah pernah dipakai, jadi mencoba bayar lagi
+  /// memerlukan acuan baru.
+  reference String @unique
+
+  /// Disalin dari total pesanan saat percobaan dibuat. Midtrans memakai
+  /// rupiah bulat, jadi nilai inilah yang dicocokkan dengan notifikasinya.
+  amount Decimal @db.Decimal(14, 2)
+
+  status PaymentStatus @default(PENDING)
+
+  snapToken String? @map("snap_token")
+
+  /// Cara bayar yang akhirnya dipilih tamu: qris, gopay, credit_card, dst.
+  channel String?
+
+  paidAt DateTime? @map("paid_at")
+
+  /// Notifikasi terakhir dari Midtrans, apa adanya.
+  lastNotification Json? @map("last_notification")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId, createdAt])
+  @@index([status])
+  @@map("payments")
 }

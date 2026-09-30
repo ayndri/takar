@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js'
+import { midtransSiap } from '../../config/env.js'
 import { badRequest } from '../../lib/errors.js'
 import {
   SETTINGS,
@@ -143,9 +144,19 @@ export async function daftarSettings(): Promise<SettingTampil[]> {
 export async function settingsPublik(): Promise<Record<string, string>> {
   const berlaku = await settingsBerlaku()
 
-  return Object.fromEntries(
+  const isi = Object.fromEntries(
     SETTINGS.filter((s) => s.publik).map((s) => [s.kunci, berlaku.get(s.kunci) ?? s.bawaan]),
   )
+
+  /**
+   * Sakelar pembayaran online boleh menyala, tapi tanpa kunci Midtrans di
+   * server tidak ada yang bisa dikerjakan. Halaman pelanggan cuma perlu tahu
+   * hasil akhirnya: pilihan itu ada atau tidak. Menawarkan tombol yang pasti
+   * gagal lebih buruk daripada tidak menawarkannya sama sekali.
+   */
+  if (!midtransSiap) isi['toko.pembayaranOnline'] = 'false'
+
+  return isi
 }
 
 const JAM_VALID = /^([01]\d|2[0-3]):([0-5]\d)$/

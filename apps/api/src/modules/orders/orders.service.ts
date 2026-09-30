@@ -19,6 +19,20 @@ const ORDER_INCLUDE = {
     include: { menu: { select: { name: true, category: true } } },
   },
   table: { select: { number: true } },
+  /**
+   * Percobaan bayar terakhir saja. Riwayat lengkapnya jarang dibutuhkan, dan
+   * yang menentukan keadaan pesanan sekarang memang yang paling akhir.
+   */
+  payments: {
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: {
+      status: true,
+      channel: true,
+      amount: true,
+      paidAt: true,
+    },
+  },
 } as const
 
 /**
@@ -78,6 +92,7 @@ export async function createOrder(input: CreateOrderInput) {
       tableId: input.tableId ?? null,
       customerName: input.customerName ?? null,
       note: input.note ?? null,
+      paymentMethod: input.paymentMethod,
       total: total.toFixed(2),
       items: {
         create: input.items.map((item) => ({

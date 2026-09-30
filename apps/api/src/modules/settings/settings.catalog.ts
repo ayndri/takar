@@ -143,6 +143,16 @@ export const SETTINGS: readonly SettingDef[] = [
     butuh: 'modul.pembelian',
   },
   {
+    kunci: 'toko.pembayaranOnline',
+    grup: 'toko',
+    tipe: 'boolean',
+    bawaan: 'true',
+    label: 'Terima pembayaran online',
+    keterangan:
+      'Tamu bisa memilih bayar duluan lewat QRIS atau e-wallet, selain bayar di kasir. Dimatikan berarti hanya bayar di kasir. Butuh kunci Midtrans terpasang di server — tanpa itu pilihannya tidak muncul walau sakelar ini nyala.',
+    publik: true,
+  },
+  {
     kunci: 'toko.sembunyikanMenuHabis',
     grup: 'toko',
     tipe: 'boolean',

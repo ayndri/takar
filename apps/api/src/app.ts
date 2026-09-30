@@ -20,6 +20,10 @@ import {
   orderStreamRouter,
   publicOrdersRouter,
 } from './modules/orders/orders.router.js'
+import {
+  paymentsRouter,
+  paymentsWebhookRouter,
+} from './modules/payments/payments.router.js'
 import { purchasesRouter } from './modules/purchases/purchases.router.js'
 import {
   adminReservationsRouter,
@@ -115,6 +119,8 @@ export function createApp(): Express {
   app.use('/api/orders', publicOrdersRouter)
   app.use('/api/tables', requireFeature('modul.meja'), tablesRouter)
   app.use('/api/reservations', requireFeature('modul.reservasi'), publicReservationsRouter)
+  app.use('/api/payments', requireFeature('toko.pembayaranOnline'), paymentsRouter)
+  app.use('/api/payments/midtrans/notification', paymentsWebhookRouter)
   app.use('/api/settings/public', publicSettingsRouter)
   app.use('/api/announcements', requireFeature('modul.promo'), publicAnnouncementsRouter)
   app.use('/api/stream/orders', orderStreamRouter)

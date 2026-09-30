@@ -8,6 +8,7 @@ import { ApiError, formatRupiah, request } from "@/lib/client-api";
 import { simpanPesananTerakhir } from "@/lib/last-order";
 import { useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
+import { muatSnap } from "@/lib/snap";
 import { usePengaturanPublik } from "@/lib/use-settings";
 
 type CafeTable = { id: string; number: string };
@@ -32,6 +33,15 @@ export function CartBar() {
   const pakaiMeja = !pengaturan.siap || pengaturan.nyala("modul.meja");
   const mejaWajib = pengaturan.nyala("toko.wajibMeja");
   const mejaKurang = mejaWajib && !meja.nilai;
+
+  /**
+   * Bayar duluan hanya ditawarkan kalau kafe menyalakannya DAN server punya
+   * kunci Midtrans. Server sudah menggabungkan dua syarat itu jadi satu
+   * nilai, jadi di sini tidak perlu tahu bedanya.
+   */
+  const bisaBayarOnline = pengaturan.nyala("toko.pembayaranOnline");
+
+  const [caraBayar, setCaraBayar] = useState<"CASHIER" | "ONLINE">("CASHIER");
 
   const [open, setOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -59,9 +69,12 @@ export function CartBar() {
     setError(null);
 
     try {
+      const pilihan = bisaBayarOnline ? caraBayar : "CASHIER";
+
       const order = await request<{ code: string }>("/api/orders", {
         method: "POST",
         body: JSON.stringify({
+          paymentMethod: pilihan,
           ...(meja.nilai && { tableId: meja.nilai }),
           ...(customerName.trim() && { customerName: customerName.trim() }),
           ...(note.trim() && { note: note.trim() }),
@@ -76,12 +89,45 @@ export function CartBar() {
       cart.clear();
       simpanPesananTerakhir(order.code);
       setOpen(false);
+
+      if (pilihan === "ONLINE") {
+        // Popup dibuka dari sini, bukan dari halaman status: kalau tamu
+        // menutupnya, dia mendarat di halaman statusnya yang sudah punya
+        // tombol "Bayar sekarang" untuk mencoba lagi.
+        await bukaPembayaran(order.code);
+      }
+
       router.push(`/pesanan/${order.code}`);
     } catch (e) {
       setError(
         e instanceof ApiError ? e.message : "Pesanan gagal dikirim, coba lagi",
       );
       setSending(false);
+    }
+  }
+
+  /**
+   * Minta token Snap lalu buka popupnya.
+   *
+   * Kegagalan di sini sengaja tidak membatalkan pesanannya. Pesanannya sudah
+   * tersimpan dan sah; yang gagal cuma pembayarannya, dan itu bisa diulang
+   * dari halaman status tanpa mengetik ulang seluruh pesanan.
+   */
+  async function bukaPembayaran(kode: string) {
+    try {
+      const bayar = await request<{
+        snapToken: string | null;
+        clientKey: string;
+        produksi: boolean;
+      }>(`/api/payments/${kode}/snap`, { method: "POST" });
+
+      if (!bayar.snapToken) return;
+
+      const snap = await muatSnap(bayar.clientKey, bayar.produksi);
+      snap.pay(bayar.snapToken, {});
+    } catch {
+      // Ditelan dengan sengaja — halaman status yang akan menjelaskan
+      // keadaannya, lengkap dengan tombol untuk mencoba lagi.
     }
   }
 
@@ -217,6 +263,50 @@ export function CartBar() {
                 </label>
               )}
 
+              {bisaBayarOnline && (
+                <fieldset className="text-sm">
+                  <legend className="text-muted">Pembayaran</legend>
+                  <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                    {(
+                      [
+                        {
+                          nilai: "CASHIER",
+                          judul: "Bayar di kasir",
+                          detail: "Setelah pesanan siap",
+                        },
+                        {
+                          nilai: "ONLINE",
+                          judul: "Bayar sekarang",
+                          detail: "QRIS atau e-wallet",
+                        },
+                      ] as const
+                    ).map((p) => (
+                      <label
+                        key={p.nilai}
+                        className={`cursor-pointer rounded-xl border px-3 py-2.5 ${
+                          caraBayar === p.nilai
+                            ? "border-accent bg-accent-soft"
+                            : "border-border"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="cara-bayar"
+                          value={p.nilai}
+                          checked={caraBayar === p.nilai}
+                          onChange={() => setCaraBayar(p.nilai)}
+                          className="sr-only"
+                        />
+                        <span className="block font-medium">{p.judul}</span>
+                        <span className="block text-xs text-muted">
+                          {p.detail}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
               <label className="block text-sm">
                 <span className="text-muted">Nama (opsional)</span>
                 <input
@@ -259,7 +349,9 @@ export function CartBar() {
                   ? "Sedang tutup"
                   : sending
                     ? "Mengirim…"
-                    : "Kirim ke dapur"}
+                    : bisaBayarOnline && caraBayar === "ONLINE"
+                      ? "Lanjut bayar"
+                      : "Kirim ke dapur"}
               </button>
             </div>
           </div>

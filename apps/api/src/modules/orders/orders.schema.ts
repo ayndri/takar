@@ -2,6 +2,12 @@ import { z } from 'zod'
 
 export const createOrderSchema = z.object({
   tableId: z.uuid('ID meja tidak valid').optional(),
+  /**
+   * Bawaannya bayar di kasir. Pesanan tetap dibuat berstatus PENDING untuk
+   * keduanya — yang membedakan cuma siapa yang nanti mengonfirmasinya:
+   * kasir, atau notifikasi pembayaran yang masuk.
+   */
+  paymentMethod: z.enum(['CASHIER', 'ONLINE']).default('CASHIER'),
   customerName: z.string().min(1).max(60).optional(),
   note: z.string().max(200).optional(),
   items: z

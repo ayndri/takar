@@ -20,6 +20,19 @@ type Order = {
   total: string;
   createdAt: string;
   table: { number: string } | null;
+  paymentMethod: "CASHIER" | "ONLINE";
+  payments: {
+    status:
+      | "PENDING"
+      | "PAID"
+      | "FAILED"
+      | "EXPIRED"
+      | "CANCELLED"
+      | "REFUND_NEEDED";
+    channel: string | null;
+    amount: string;
+    paidAt: string | null;
+  }[];
   items: {
     id: string;
     qty: number;
@@ -46,6 +59,48 @@ const KOLOM = [
   { status: "PREPARING", judul: "Dibuat" },
   { status: "READY", judul: "Siap diambil" },
 ] as const;
+
+/**
+ * Keadaan pembayaran di kartu pesanan.
+ *
+ * Yang paling penting di sini REFUND_NEEDED: uang tamu sudah masuk tapi
+ * bahannya keburu habis, jadi ada orang yang harus diuruskan uangnya. Itu
+ * satu-satunya keadaan yang diberi warna merah dan kalimat penuh — sisanya
+ * cukup label pendek.
+ */
+function LabelBayar({
+  order,
+}: {
+  order: { paymentMethod: string; payments: { status: string }[] };
+}) {
+  if (order.paymentMethod !== "ONLINE") {
+    return <span className="block text-xs text-muted">Bayar di kasir</span>;
+  }
+
+  const status = order.payments[0]?.status ?? "PENDING";
+
+  if (status === "REFUND_NEEDED") {
+    return (
+      <span className="mt-1 block rounded-lg bg-danger/15 px-2 py-1 text-xs font-medium text-danger">
+        Sudah dibayar, bahan tidak cukup — uangnya harus dikembalikan
+      </span>
+    );
+  }
+
+  if (status === "PAID") {
+    return (
+      <span className="mt-1 inline-block rounded bg-accent-soft px-1.5 py-0.5 text-xs text-accent-ink">
+        Lunas online
+      </span>
+    );
+  }
+
+  return (
+    <span className="mt-1 inline-block rounded bg-warning/15 px-1.5 py-0.5 text-xs text-warning">
+      Online, belum dibayar
+    </span>
+  );
+}
 
 export default function PesananPage() {
   const session = useSession();
@@ -316,6 +371,8 @@ export default function PesananPage() {
                       <span className="mt-3 block text-sm font-medium">
                         {formatRupiah(order.total)}
                       </span>
+
+                      <LabelBayar order={order} />
                       <span className="block text-xs text-muted">
                         {formatWaktu(order.createdAt)}
                       </span>

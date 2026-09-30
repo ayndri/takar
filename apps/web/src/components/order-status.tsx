@@ -1,6 +1,8 @@
 "use client";
 
-import { formatRupiah, formatWaktu } from "@/lib/client-api";
+import { useState } from "react";
+import { ApiError, formatRupiah, formatWaktu, request } from "@/lib/client-api";
+import { muatSnap } from "@/lib/snap";
 import { useApi } from "@/lib/use-api";
 
 type Order = {
@@ -11,6 +13,19 @@ type Order = {
   total: string;
   createdAt: string;
   table: { number: string } | null;
+  paymentMethod: "CASHIER" | "ONLINE";
+  payments: {
+    status:
+      | "PENDING"
+      | "PAID"
+      | "FAILED"
+      | "EXPIRED"
+      | "CANCELLED"
+      | "REFUND_NEEDED";
+    channel: string | null;
+    amount: string;
+    paidAt: string | null;
+  }[];
   items: {
     id: string;
     qty: number;
@@ -29,12 +44,72 @@ const TAHAPAN = [
   { status: "DONE", label: "Selesai", detail: "Terima kasih!" },
 ] as const;
 
+/** Yang dibaca tamu, bukan istilah Midtrans. */
+const KABAR_BAYAR: Record<string, { teks: string; nada: "tunggu" | "aman" | "gagal" }> = {
+  PENDING: { teks: "Menunggu pembayaran", nada: "tunggu" },
+  PAID: { teks: "Pembayaran diterima", nada: "aman" },
+  FAILED: { teks: "Pembayaran gagal", nada: "gagal" },
+  EXPIRED: { teks: "Batas waktu pembayaran habis", nada: "gagal" },
+  CANCELLED: { teks: "Pembayaran dibatalkan", nada: "gagal" },
+  REFUND_NEEDED: {
+    teks: "Sudah dibayar, tapi bahannya keburu habis — kafe akan menghubungimu untuk pengembalian dana",
+    nada: "gagal",
+  },
+};
+
 export function OrderStatus({ code }: { code: string }) {
+  const [sibukBayar, setSibukBayar] = useState(false);
+  const [galatBayar, setGalatBayar] = useState<string | null>(null);
   // Pelanggan cuma melihat satu pesanan, jadi polling ringan sudah cukup —
   // tidak perlu buka koneksi SSE seperti layar dapur.
-  const { data: order, error } = useApi<Order>(`/api/orders/${code}`, {
+  const { data: order, error, mutate } = useApi<Order>(`/api/orders/${code}`, {
     refreshInterval: 8000,
   });
+
+  /**
+   * Buka lagi popup pembayaran.
+   *
+   * Sebelum memintanya, backend ditanya dulu apakah ada kabar baru dari
+   * Midtrans. Notifikasi bisa tercecer di jaringan — dan saat dikembangkan di
+   * laptop, Midtrans memang tidak bisa memanggil localhost sama sekali. Tanpa
+   * langkah ini, pesanan yang sebenarnya sudah lunas bisa terlihat menggantung
+   * selamanya.
+   */
+  async function bayar() {
+    setSibukBayar(true);
+    setGalatBayar(null);
+
+    try {
+      await request(`/api/payments/${code}/refresh`, { method: "POST" }).catch(
+        () => null,
+      );
+
+      const segar = await mutate();
+      if (segar?.payments[0]?.status === "PAID") return;
+
+      const bayar = await request<{
+        snapToken: string | null;
+        clientKey: string;
+        produksi: boolean;
+      }>(`/api/payments/${code}/snap`, { method: "POST" });
+
+      if (!bayar.snapToken) throw new Error("Token pembayaran tidak diterima");
+
+      const snap = await muatSnap(bayar.clientKey, bayar.produksi);
+
+      snap.pay(bayar.snapToken, {
+        onSuccess: () => void mutate(),
+        onPending: () => void mutate(),
+        onClose: () => void mutate(),
+      });
+    } catch (e) {
+      setGalatBayar(
+        e instanceof ApiError ? e.message : "Gagal membuka halaman pembayaran",
+      );
+    } finally {
+      setSibukBayar(false);
+    }
+  }
 
   if (error) {
     return (
@@ -51,6 +126,16 @@ export function OrderStatus({ code }: { code: string }) {
 
   const currentIndex = TAHAPAN.findIndex((t) => t.status === order.status);
   const dibatalkan = order.status === "CANCELLED";
+
+  const bayaran = order.payments[0];
+  const kabar = bayaran ? KABAR_BAYAR[bayaran.status] : undefined;
+
+  // Tombol bayar ditawarkan selama pesanannya masih bisa dibayar. Pesanan
+  // yang sudah dikonfirmasi berarti uangnya sudah masuk atau kasir sudah
+  // menanganinya; menawarkan bayar lagi di situ cuma membingungkan.
+  const perluBayar =
+    order.status === "PENDING" &&
+    (!bayaran || ["PENDING", "FAILED", "EXPIRED", "CANCELLED"].includes(bayaran.status));
 
   return (
     <div className="mt-6">
@@ -99,6 +184,44 @@ export function OrderStatus({ code }: { code: string }) {
             );
           })}
         </ol>
+      )}
+
+      {order.paymentMethod === "ONLINE" && (
+        <div
+          className={`mt-2 rounded-xl border p-4 ${
+            kabar?.nada === "aman"
+              ? "border-accent/40 bg-accent-soft/40"
+              : kabar?.nada === "gagal"
+                ? "border-danger/40"
+                : "border-warning/40"
+          }`}
+        >
+          <p className="text-sm font-medium">
+            {kabar?.teks ?? "Menunggu pembayaran"}
+          </p>
+
+          {bayaran?.channel && bayaran.status === "PAID" && (
+            <p className="mt-0.5 text-sm text-muted">
+              Lewat {bayaran.channel.replace(/_/g, " ")}
+              {bayaran.paidAt && ` · ${formatWaktu(bayaran.paidAt)}`}
+            </p>
+          )}
+
+          {galatBayar && (
+            <p className="mt-2 text-sm text-danger">{galatBayar}</p>
+          )}
+
+          {perluBayar && (
+            <button
+              type="button"
+              onClick={bayar}
+              disabled={sibukBayar}
+              className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {sibukBayar ? "Membuka…" : "Bayar sekarang"}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="mt-2 rounded-xl border border-border bg-surface p-4">
