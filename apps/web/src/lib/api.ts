@@ -80,6 +80,12 @@ export type Paginated<T> = {
   page: number
   pageSize: number
   pages: number
+  /**
+   * Isi tiap kategori menurut kata kunci yang sedang dipakai — bukan jumlah
+   * global. Tidak ikut menyaring kategori yang sedang dipilih, supaya masih
+   * kelihatan ke mana bisa berpindah.
+   */
+  categories?: { name: string; count: number }[]
 }
 
 export const getPublicMenus = (params: {

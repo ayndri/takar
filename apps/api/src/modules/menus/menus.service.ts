@@ -84,15 +84,26 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
   const page = Math.max(1, params.page ?? 1)
   const pageSize = Math.min(96, Math.max(1, params.pageSize ?? 12))
 
-  const where = {
+  /**
+   * Saringan tanpa kategori — dasar untuk menghitung isi tiap kategori.
+   *
+   * Sengaja tidak ikut menyaring kategori yang sedang dipilih. Kalau ikut,
+   * memilih "Sarapan" membuat semua kategori lain menunjukkan nol, dan tidak
+   * ada lagi petunjuk ke mana harus berpindah.
+   */
+  const whereTanpaKategori = {
     isActive: true,
-    ...(params.category && { category: params.category }),
     ...(params.q && {
       OR: [
         { name: { contains: params.q, mode: 'insensitive' as const } },
         { category: { contains: params.q, mode: 'insensitive' as const } },
       ],
     }),
+  }
+
+  const where = {
+    ...whereTanpaKategori,
+    ...(params.category && { category: params.category }),
   }
 
   /**
@@ -115,7 +126,10 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
 
   const [menus, stock, terjual] = await Promise.all([
     prisma.menu.findMany({
-      where,
+      // Saat menu habis disembunyikan, yang diambil seluruh menu yang cocok
+      // dengan kata kunci tanpa saringan kategori — daftar itu sekaligus
+      // dipakai menghitung isi tiap kategori, jadi tidak perlu query kedua.
+      where: sembunyikanHabis ? whereTanpaKategori : where,
       include: { recipes: { select: { ingredientId: true, qty: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
       ...(sembunyikanHabis
@@ -165,11 +179,44 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
     }
   })
 
-  if (!sembunyikanHabis) {
-    return { items, total, page: halaman, pageSize, pages }
+  /** Isi tiap kategori menurut kata kunci yang sedang dipakai. */
+  const hitungKategori = (daftar: { category: string }[]) => {
+    const per = new Map<string, number>()
+    for (const m of daftar) per.set(m.category, (per.get(m.category) ?? 0) + 1)
+
+    return [...per]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'id'))
   }
 
-  const tersedia = items.filter((m) => m.available)
+  if (!sembunyikanHabis) {
+    // `items` di sini cuma satu halaman, jadi jumlah per kategori harus
+    // ditanyakan terpisah ke database.
+    const perKategori = await prisma.menu.groupBy({
+      by: ['category'],
+      _count: { _all: true },
+      where: whereTanpaKategori,
+    })
+
+    return {
+      items,
+      total,
+      page: halaman,
+      pageSize,
+      pages,
+      categories: perKategori
+        .map((c) => ({ name: c.category, count: c._count._all }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'id')),
+    }
+  }
+
+  // Semua menu yang cocok sudah ada di tangan, tinggal disaring.
+  const tersediaSemua = items.filter((m) => m.available)
+
+  const tersedia = params.category
+    ? tersediaSemua.filter((m) => m.category === params.category)
+    : tersediaSemua
+
   const pagesTersedia = Math.max(1, Math.ceil(tersedia.length / pageSize))
   const halamanTersedia = Math.min(page, pagesTersedia)
 
@@ -179,6 +226,7 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
     page: halamanTersedia,
     pageSize,
     pages: pagesTersedia,
+    categories: hitungKategori(tersediaSemua),
   }
 }
 

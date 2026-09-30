@@ -99,6 +99,25 @@ export function KatalogMenu({
   const hasil = data ?? awal;
   const memuat = !hasil && !error;
 
+  /**
+   * Jumlah per kategori diambil dari hasil pencarian, bukan dari angka global.
+   * Kalau memakai angka global, mencari "kaca" yang tidak cocok apa pun tetap
+   * menampilkan "Kopi 14" — dan chip itu jadi janji yang tidak ditepati.
+   *
+   * Kalau hasilnya belum datang, angka dari server dipakai dulu supaya
+   * chipnya tidak berkedip kosong sesaat.
+   */
+  const jumlahSekarang: Record<string, number> = Object.fromEntries(
+    (hasil?.categories ?? []).map((c) => [c.name, c.count]),
+  );
+
+  const jumlah = (nama: string) =>
+    hasil?.categories ? (jumlahSekarang[nama] ?? 0) : (jumlahPerKategori[nama] ?? 0);
+
+  const totalSemua = hasil?.categories
+    ? hasil.categories.reduce((a, c) => a + c.count, 0)
+    : Object.values(jumlahPerKategori).reduce((a, n) => a + n, 0);
+
   const awalNomor = hasil ? (hasil.page - 1) * hasil.pageSize + 1 : 0;
   const akhirNomor = hasil
     ? Math.min(hasil.page * hasil.pageSize, hasil.total)
@@ -109,11 +128,13 @@ export function KatalogMenu({
     setHal(1);
   }
 
-  const kelasChip = (aktif: boolean) =>
+  const kelasChip = (aktif: boolean, kosong = false) =>
     `inline-block rounded-xl border px-3 py-1.5 text-sm ${
       aktif
         ? "border-ink bg-ink text-paper"
-        : "border-border bg-surface text-muted hover:text-ink"
+        : kosong
+          ? "border-border bg-surface text-muted opacity-40"
+          : "border-border bg-surface text-muted hover:text-ink"
     }`;
 
   return (
@@ -150,23 +171,32 @@ export function KatalogMenu({
                 className={kelasChip(kategori === "")}
               >
                 Semua
+                <span className="ml-1.5 text-xs opacity-70">{totalSemua}</span>
               </button>
             </li>
-            {kategoriTersedia.map((k) => (
-              <li key={k}>
-                <button
-                  type="button"
-                  onClick={() => gantiKategori(k)}
-                  aria-current={kategori === k ? "true" : undefined}
-                  className={kelasChip(kategori === k)}
-                >
-                  {k}
-                  <span className="ml-1.5 text-xs opacity-70">
-                    {jumlahPerKategori[k]}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {kategoriTersedia.map((k) => {
+              const n = jumlah(k);
+              const dipilih = kategori === k;
+
+              return (
+                <li key={k}>
+                  {/* Kategori kosong diredupkan dan dimatikan, bukan
+                      dihilangkan: daftar yang jumlah chipnya berubah tiap
+                      ketikan membuat yang lain melompat-lompat. Yang sedang
+                      dipilih tetap bisa ditekan supaya tidak terkunci. */}
+                  <button
+                    type="button"
+                    disabled={n === 0 && !dipilih}
+                    onClick={() => gantiKategori(k)}
+                    aria-current={dipilih ? "true" : undefined}
+                    className={kelasChip(dipilih, n === 0)}
+                  >
+                    {k}
+                    <span className="ml-1.5 text-xs opacity-70">{n}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
       )}
