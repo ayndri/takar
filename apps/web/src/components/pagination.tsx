@@ -1,19 +1,75 @@
 import Link from "next/link";
 
 /**
+ * Satu tombol halaman.
+ *
+ * Bentuknya menyesuaikan: tombol kalau halamannya diganti di tempat, tautan
+ * kalau berpindah alamat. Didefinisikan di tingkat modul, bukan di dalam
+ * Pagination — komponen yang dibuat ulang tiap render membuat React
+ * membongkar-pasang seluruh isinya dan fokus papan ketik ikut hilang.
+ */
+function Ke({
+  ke,
+  rel,
+  ariaCurrent,
+  className,
+  buatTautan,
+  onPilih,
+  children,
+}: {
+  ke: number;
+  rel?: string;
+  ariaCurrent?: "page";
+  className: string;
+  buatTautan: (halaman: number) => string;
+  onPilih?: (halaman: number) => void;
+  children: React.ReactNode;
+}) {
+  if (onPilih) {
+    return (
+      <button
+        type="button"
+        onClick={() => onPilih(ke)}
+        aria-current={ariaCurrent}
+        className={className}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={buatTautan(ke)}
+      rel={rel}
+      aria-current={ariaCurrent}
+      className={className}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
  * Navigasi halaman katalog.
  *
  * Nomor halaman dipangkas di sekitar halaman aktif, jadi delapan halaman
  * tampil utuh sementara tiga puluh halaman tidak memenuhi layar.
+ *
+ * Dua mode, satu logika. Kalau `onPilih` diberikan, nomornya jadi tombol yang
+ * mengganti isi halaman tanpa pindah alamat; kalau tidak, jadi tautan biasa
+ * yang tetap berfungsi tanpa JavaScript.
  */
 export function Pagination({
   page,
   pages,
   buatTautan,
+  onPilih,
 }: {
   page: number;
   pages: number;
   buatTautan: (halaman: number) => string;
+  onPilih?: (halaman: number) => void;
 }) {
   if (pages <= 1) return null;
 
@@ -37,13 +93,15 @@ export function Pagination({
       className="mt-8 flex flex-wrap items-center justify-center gap-2"
     >
       {page > 1 ? (
-        <Link
-          href={buatTautan(page - 1)}
+        <Ke
+          ke={page - 1}
+          buatTautan={buatTautan}
+          onPilih={onPilih}
           rel="prev"
           className={`${tombol} border-border bg-surface hover:border-accent`}
         >
           Sebelumnya
-        </Link>
+        </Ke>
       ) : (
         <span className={`${tombol} border-border text-muted opacity-50`}>
           Sebelumnya
@@ -56,10 +114,12 @@ export function Pagination({
             …
           </span>
         ) : (
-          <Link
+          <Ke
             key={n}
-            href={buatTautan(n)}
-            aria-current={n === page ? "page" : undefined}
+            ke={n}
+            buatTautan={buatTautan}
+            onPilih={onPilih}
+            ariaCurrent={n === page ? "page" : undefined}
             className={`${tombol} ${
               n === page
                 ? "border-accent bg-accent font-medium text-white"
@@ -67,18 +127,20 @@ export function Pagination({
             }`}
           >
             {n}
-          </Link>
+          </Ke>
         ),
       )}
 
       {page < pages ? (
-        <Link
-          href={buatTautan(page + 1)}
+        <Ke
+          ke={page + 1}
+          buatTautan={buatTautan}
+          onPilih={onPilih}
           rel="next"
           className={`${tombol} border-border bg-surface hover:border-accent`}
         >
           Berikutnya
-        </Link>
+        </Ke>
       ) : (
         <span className={`${tombol} border-border text-muted opacity-50`}>
           Berikutnya
