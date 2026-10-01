@@ -3,6 +3,12 @@
 import { formatRupiah } from "@/lib/client-api";
 import { useApi } from "@/lib/use-api";
 import { JagaModul } from "@/components/ui/fitur-mati";
+import {
+  GrafikBatang,
+  GrafikOmzet,
+  WARNA_GRAFIK,
+  type TitikHarian,
+} from "@/components/ui/grafik";
 
 type Sales = {
   orderCount: number;
@@ -48,8 +54,69 @@ const LABEL_ALASAN: Record<string, string> = {
   OTHER: "Lainnya",
 };
 
+/**
+ * Angka di balik grafiknya, disembunyikan di balik satu baris yang bisa
+ * dibuka.
+ *
+ * Bukan sekadar pelengkap: grafik menyampaikan bentuk, bukan nilai, dan ada
+ * orang yang membaca halaman ini dengan pembaca layar. Ditutup secara bawaan
+ * supaya halamannya tidak jadi dua kali lebih panjang untuk yang tidak
+ * membutuhkannya.
+ */
+function TabelAngka({
+  judul,
+  kepala,
+  baris,
+}: {
+  judul: string;
+  kepala: string[];
+  baris: string[][];
+}) {
+  if (baris.length === 0) return null;
+
+  return (
+    <details className="mt-4">
+      <summary className="cursor-pointer text-xs text-muted hover:text-ink">
+        {judul}
+      </summary>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border text-muted">
+            <tr>
+              {kepala.map((k, i) => (
+                <th
+                  key={k}
+                  scope="col"
+                  className={`py-2 font-normal ${i === 0 ? "text-left" : "text-right"}`}
+                >
+                  {k}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {baris.map((b) => (
+              <tr key={b.join("|")} className="border-b border-border last:border-0">
+                {b.map((sel, i) => (
+                  <td
+                    key={i}
+                    className={`py-1.5 ${i === 0 ? "" : "text-right tabular-nums"}`}
+                  >
+                    {sel}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 function IsiLaporanPage() {
   const penjualan = useApi<Sales>("/api/reports/sales");
+  const tren = useApi<TitikHarian[]>("/api/reports/sales-trend");
   const pembuangan = useApi<Waste>("/api/reports/waste");
   const persediaan = useApi<Inventory>("/api/reports/inventory");
   const marginMenu = useApi<Margin[]>("/api/reports/margins");
@@ -58,6 +125,7 @@ function IsiLaporanPage() {
   const waste = pembuangan.data;
   const inventory = persediaan.data;
   const margins = marginMenu.data ?? [];
+  const harian = tren.data ?? [];
 
   const error =
     penjualan.error ?? pembuangan.error ?? persediaan.error ?? marginMenu.error;
@@ -103,20 +171,53 @@ function IsiLaporanPage() {
         />
       </div>
 
+      <div className="mb-6">
+        <Panel judul="Omzet dan laba kotor per hari">
+          {tren.isLoading ? (
+            <p className="py-8 text-center text-sm text-muted">Memuat grafik…</p>
+          ) : (
+            <>
+              <GrafikOmzet data={harian} />
+              <TabelAngka
+                judul={`Lihat ${harian.length} hari dalam angka`}
+                kepala={["Tanggal", "Omzet", "Laba kotor", "Pesanan"]}
+                baris={harian.map((d) => [
+                  new Intl.DateTimeFormat("id-ID", {
+                    day: "numeric",
+                    month: "short",
+                  }).format(new Date(d.date)),
+                  formatRupiah(d.revenue),
+                  formatRupiah(d.grossProfit),
+                  String(d.orderCount),
+                ])}
+              />
+            </>
+          )}
+        </Panel>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel judul="Menu paling laku">
           {sales?.topMenus.length ? (
-            <ul className="space-y-2 text-sm">
-              {sales.topMenus.map((m) => (
-                <li key={m.menuId} className="flex justify-between gap-3">
-                  <span>
-                    {m.name}
-                    <span className="text-muted"> · {m.qty} porsi</span>
-                  </span>
-                  <span className="tabular-nums">{formatRupiah(m.revenue)}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <GrafikBatang
+                satuan="Porsi terjual"
+                data={sales.topMenus.map((m) => ({
+                  nama: m.name,
+                  nilai: m.qty,
+                  keterangan: formatRupiah(m.revenue),
+                }))}
+              />
+              <TabelAngka
+                judul="Lihat dalam angka"
+                kepala={["Menu", "Porsi", "Omzet"]}
+                baris={sales.topMenus.map((m) => [
+                  m.name,
+                  String(m.qty),
+                  formatRupiah(m.revenue),
+                ])}
+              />
+            </>
           ) : (
             <p className="text-sm text-muted">Belum ada penjualan.</p>
           )}
@@ -147,16 +248,28 @@ function IsiLaporanPage() {
 
         <Panel judul="Bocor ke mana">
           {waste?.byReason.length ? (
-            <ul className="space-y-2 text-sm">
-              {waste.byReason.map((r) => (
-                <li key={r.reason} className="flex justify-between gap-3">
-                  <span>{LABEL_ALASAN[r.reason] ?? r.reason}</span>
-                  <span className="text-danger tabular-nums">
-                    {formatRupiah(r.value)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {/* Teal, bukan merah. Merah sudah dipakai menandai keadaan yang
+                  perlu ditindaklanjuti di seluruh aplikasi ini; memakainya
+                  lagi sebagai warna seri membuat keduanya kehilangan arti. */}
+              <GrafikBatang
+                satuan="Nilai terbuang"
+                warna={WARNA_GRAFIK.laba}
+                format={(n) => formatRupiah(n)}
+                data={waste.byReason.map((r) => ({
+                  nama: LABEL_ALASAN[r.reason] ?? r.reason,
+                  nilai: Number(r.value),
+                }))}
+              />
+              <TabelAngka
+                judul="Lihat dalam angka"
+                kepala={["Alasan", "Nilai"]}
+                baris={waste.byReason.map((r) => [
+                  LABEL_ALASAN[r.reason] ?? r.reason,
+                  formatRupiah(r.value),
+                ])}
+              />
+            </>
           ) : (
             <p className="text-sm text-muted">
               Belum ada waste tercatat. Kalau selisih opname besar tapi ini

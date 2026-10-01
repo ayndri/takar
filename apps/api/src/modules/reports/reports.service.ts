@@ -325,3 +325,101 @@ export async function menuMargins() {
     })
     .sort((a, b) => Number(a.marginPercent) - Number(b.marginPercent))
 }
+
+/**
+ * Omzet, HPP, dan laba kotor per hari.
+ *
+ * salesSummary memberi satu angka untuk seluruh rentang — berguna untuk kartu
+ * ringkasan, tapi tidak bisa dipakai menggambar apa pun. Yang menunjukkan
+ * kapan kafe ramai dan kapan sepi justru bentuk hariannya.
+ *
+ * Hari yang tidak ada penjualannya tetap dikeluarkan sebagai nol. Kalau
+ * dilewati begitu saja, garisnya memotong lurus dari Jumat ke Senin dan
+ * akhir pekan yang tutup terlihat seperti hari biasa.
+ */
+export async function salesTrend(range: Range = {}) {
+  const orders = await prisma.order.findMany({
+    where: {
+      status: { in: ['CONFIRMED', 'PREPARING', 'READY', 'DONE'] },
+      confirmedAt: { not: null, ...rangeFilter(range) },
+    },
+    select: {
+      id: true,
+      confirmedAt: true,
+      items: { select: { qty: true, unitPrice: true } },
+    },
+    orderBy: { confirmedAt: 'asc' },
+  })
+
+  if (orders.length === 0) return []
+
+  const hpp = await prisma.stockMovement.findMany({
+    where: {
+      refType: 'order',
+      refId: { in: orders.map((o) => o.id) },
+      type: 'SALE',
+    },
+    select: { refId: true, qty: true, unitCost: true },
+  })
+
+  const hppPerPesanan = new Map<string, Decimal>()
+  for (const m of hpp) {
+    if (!m.refId || !m.unitCost) continue
+    // qty movement SALE bernilai negatif — dibalik supaya HPP positif.
+    const nilai = new Decimal(m.qty.toString()).neg().mul(m.unitCost.toString())
+    hppPerPesanan.set(m.refId, (hppPerPesanan.get(m.refId) ?? new Decimal(0)).plus(nilai))
+  }
+
+  type Hari = { omzet: Decimal; hpp: Decimal; pesanan: number }
+  const perHari = new Map<string, Hari>()
+
+  for (const o of orders) {
+    const hari = o.confirmedAt!.toISOString().slice(0, 10)
+    const isi = perHari.get(hari) ?? {
+      omzet: new Decimal(0),
+      hpp: new Decimal(0),
+      pesanan: 0,
+    }
+
+    const omzet = o.items.reduce(
+      (sum, i) => sum.plus(new Decimal(i.unitPrice.toString()).mul(i.qty)),
+      new Decimal(0),
+    )
+
+    perHari.set(hari, {
+      omzet: isi.omzet.plus(omzet),
+      hpp: isi.hpp.plus(hppPerPesanan.get(o.id) ?? new Decimal(0)),
+      pesanan: isi.pesanan + 1,
+    })
+  }
+
+  // Hari kosong di antara hari pertama dan terakhir ikut diisi nol.
+  const tanggal = [...perHari.keys()].sort()
+  const mulai = new Date(`${tanggal[0]}T00:00:00.000Z`)
+  const selesai = new Date(`${tanggal.at(-1)}T00:00:00.000Z`)
+
+  const hasil: {
+    date: string
+    revenue: string
+    cogs: string
+    grossProfit: string
+    orderCount: number
+  }[] = []
+
+  for (let d = mulai; d <= selesai; d = new Date(d.getTime() + 86_400_000)) {
+    const hari = d.toISOString().slice(0, 10)
+    const isi = perHari.get(hari)
+
+    hasil.push({
+      date: hari,
+      revenue: (isi?.omzet ?? new Decimal(0)).toFixed(2),
+      cogs: (isi?.hpp ?? new Decimal(0)).toFixed(2),
+      grossProfit: (isi?.omzet ?? new Decimal(0))
+        .minus(isi?.hpp ?? new Decimal(0))
+        .toFixed(2),
+      orderCount: isi?.pesanan ?? 0,
+    })
+  }
+
+  return hasil
+}

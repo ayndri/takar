@@ -8,6 +8,7 @@ import {
   lowStock,
   menuMargins,
   salesSummary,
+  salesTrend,
   usageTrend,
   wasteSummary,
 } from './reports.service.js'
@@ -46,6 +47,10 @@ reportsRouter.get('/waste', validateQuery(rangeSchema), async (_req, res) => {
 
 reportsRouter.get('/sales', validateQuery(rangeSchema), async (_req, res) => {
   res.json(await salesSummary(getQuery<Range>(res)))
+})
+
+reportsRouter.get('/sales-trend', validateQuery(rangeSchema), async (_req, res) => {
+  res.json(await salesTrend(getQuery<{ from?: string; to?: string }>(res)))
 })
 
 reportsRouter.get('/usage', validateQuery(rangeSchema), async (_req, res) => {
