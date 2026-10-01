@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { getUser, requireAuth, requireRole } from '../../middleware/auth.js'
 import { getQuery, validateQuery } from '../../middleware/validate.js'
+import { buatLaporanExcel } from './reports.export.js'
 import {
   dashboardSummary,
   inventoryValue,
@@ -55,6 +56,29 @@ reportsRouter.get('/sales-trend', validateQuery(rangeSchema), async (_req, res) 
 
 reportsRouter.get('/usage', validateQuery(rangeSchema), async (_req, res) => {
   res.json(await usageTrend(getQuery<Range>(res)))
+})
+
+/**
+ * Seluruh laporan dalam satu berkas Excel.
+ *
+ * Dibangun di memori lalu dikirim langsung; tidak ada berkas sementara yang
+ * ditulis ke disk. Penyedia hosting serverless tidak punya disk yang bertahan
+ * antar permintaan, dan laporan kafe ukurannya puluhan kilobita.
+ */
+reportsRouter.get('/export', validateQuery(rangeSchema), async (_req, res) => {
+  const { buffer, nama } = await buatLaporanExcel(
+    getQuery<{ from?: string; to?: string }>(res),
+  )
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  res.setHeader('Content-Disposition', `attachment; filename="${nama}"`)
+  // Dibuka lintas asal lewat fetch, jadi namanya harus boleh dibaca browser.
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition')
+
+  res.send(buffer)
 })
 
 reportsRouter.get('/margins', async (_req, res) => {

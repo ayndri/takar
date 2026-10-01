@@ -53,6 +53,11 @@ lawan.startAt`). Itu mungkin karena `endAt` ikut disimpan, tidak dihitung dari
 durasi saat query. Mengubah durasi di pengaturan tidak boleh diam-diam
 menggeser reservasi yang sudah dijanjikan ke tamu.
 
+Bahan untuk pesanan yang menunggu konfirmasi ikut disisihkan, jadi pesanan
+berikutnya tidak bisa menghabiskannya sambil yang pertama masih mengantre.
+Penyisihan itu kedaluwarsa sendiri kalau kasir tidak kunjung menekan
+konfirmasi.
+
 **Uang sudah masuk, bahannya keburu habis.**
 
 Pembayaran online membuat perebutan pertama punya korban. Yang diaktifkan cuma
@@ -78,7 +83,8 @@ pelacakan pesanan, reservasi meja, dan pembayaran QRIS.
 
 Kafe dapat papan dapur yang hidup lewat SSE, kartu stok tiap bahan, resep
 dengan HPP dan marginnya, nota pembelian berbukti foto, catatan waste, stock
-opname, QR meja siap cetak, papan reservasi, promo, dan laporan bergrafik.
+opname, QR meja siap cetak, papan reservasi, promo, dan laporan bergrafik
+yang bisa diunduh sebagai Excel.
 
 Angka uang cuma terlihat oleh `OWNER`. Barista mengelola pesanan tanpa melihat
 margin.
@@ -107,9 +113,9 @@ Tangkapan layar: taruh berkasnya di docs/screenshots/, lalu hapus komentar ini.
 | Auth | JWT sendiri (`jsonwebtoken` + `bcryptjs`) |
 | Realtime | SSE untuk papan dapur |
 | Pembayaran | Midtrans Snap (sandbox) |
-| Test | Vitest, 108 unit test |
+| Test | Vitest, 114 unit test |
 
-Monorepo npm workspaces: `apps/api` dan `apps/web`. 20 tabel, 5 migrasi.
+Monorepo npm workspaces: `apps/api` dan `apps/web`. 21 tabel, 6 migrasi.
 
 ### Beberapa pilihan yang perlu dijelaskan
 
@@ -168,7 +174,7 @@ ledger.
 Pembayaran online mati sampai kunci Midtrans diisi. Sisanya tetap jalan.
 
 ```bash
-npm run test                             # 108 unit test
+npm run test                             # 114 unit test
 npx tsc --noEmit -p apps/api/tsconfig.json
 npm run lint
 ```
@@ -179,8 +185,9 @@ npm run lint
 
 ```
 apps/api/src/
-  modules/stock/stock-calculator.ts        hitungan stok murni, 26 test
+  modules/stock/stock-calculator.ts        hitungan stok murni, 32 test
   modules/stock/stock.service.ts           lockStocks, applyMovements
+  modules/stock/stock-reservation.service.ts  penyisihan bahan & pelepasannya
   modules/orders/orders.service.ts         konfirmasi & potong stok
   modules/reservations/
     reservation-calculator.ts              jadwal & zona waktu, 31 test
@@ -200,7 +207,7 @@ apps/web/src/
 ```
 
 Logika yang bisa berdiri sendiri dipisah dari database dan Express. Itu yang
-diuji 108 kali, tanpa perlu menyiapkan apa pun.
+diuji 114 kali, tanpa perlu menyiapkan apa pun.
 
 ---
 
@@ -209,13 +216,8 @@ diuji 108 kali, tanpa perlu menyiapkan apa pun.
 Integration test yang benar-benar menyentuh database. Unit test sudah banyak,
 yang ini belum.
 
-Reservasi stok saat pesanan dibuat. Belum perlu selama pembayaran dibatasi ke
-metode instan, tapi langsung perlu begitu virtual account diaktifkan.
-
 Multi-outlet. Skemanya sudah punya `TRANSFER_IN` dan `TRANSFER_OUT`, alurnya
 belum.
-
-Export laporan ke PDF atau Excel.
 
 Foto menu masih dari Unsplash.
 

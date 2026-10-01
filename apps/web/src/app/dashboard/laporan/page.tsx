@@ -1,6 +1,7 @@
 "use client";
 
-import { formatRupiah } from "@/lib/client-api";
+import { useState } from "react";
+import { ApiError, formatRupiah, unduh } from "@/lib/client-api";
 import { useApi } from "@/lib/use-api";
 import { JagaModul } from "@/components/ui/fitur-mati";
 import {
@@ -125,6 +126,30 @@ function IsiLaporanPage() {
   const waste = pembuangan.data;
   const inventory = persediaan.data;
   const margins = marginMenu.data ?? [];
+
+  const [mengunduh, setMengunduh] = useState(false);
+  const [galatUnduh, setGalatUnduh] = useState<string | null>(null);
+
+  /**
+   * Unduh seluruh laporan sebagai satu berkas Excel.
+   *
+   * Lewat fetch, bukan tautan biasa, karena endpoint-nya butuh token. Tautan
+   * <a href> tidak membawa header Authorization.
+   */
+  async function unduhLaporan() {
+    setMengunduh(true);
+    setGalatUnduh(null);
+
+    try {
+      await unduh("/api/reports/export");
+    } catch (e) {
+      setGalatUnduh(
+        e instanceof ApiError ? e.message : "Gagal menyiapkan berkas",
+      );
+    } finally {
+      setMengunduh(false);
+    }
+  }
   const harian = tren.data ?? [];
 
   const error =
@@ -140,11 +165,27 @@ function IsiLaporanPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Laporan</h1>
-        <p className="mt-1 text-sm text-muted">
-          Semua angka dihitung dari ledger, bukan dari catatan terpisah.
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Laporan</h1>
+          <p className="mt-1 text-sm text-muted">
+            Semua angka dihitung dari ledger, bukan dari catatan terpisah.
+          </p>
+        </div>
+
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={unduhLaporan}
+            disabled={mengunduh}
+            className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:border-accent disabled:opacity-50"
+          >
+            {mengunduh ? "Menyiapkan…" : "Unduh Excel"}
+          </button>
+          {galatUnduh && (
+            <p className="mt-1 text-xs text-danger">{galatUnduh}</p>
+          )}
+        </div>
       </div>
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

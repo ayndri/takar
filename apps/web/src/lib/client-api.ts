@@ -110,3 +110,47 @@ export const formatWaktu = (iso: string) =>
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(iso));
+
+/**
+ * Unduh berkas dari endpoint yang butuh login.
+ *
+ * Tautan `<a href>` biasa tidak membawa header Authorization, jadi berkasnya
+ * diambil lewat fetch lalu disodorkan ke browser sebagai blob. Nama berkasnya
+ * dibaca dari Content-Disposition supaya yang menentukan tetap server.
+ */
+export async function unduh(path: string) {
+  const token = getToken();
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let message = `Gagal mengunduh (${res.status})`;
+    try {
+      const payload = (await res.json()) as { error?: { message?: string } };
+      message = payload.error?.message ?? message;
+    } catch {
+      // Balasan bukan JSON.
+    }
+    throw new ApiError(res.status, message);
+  }
+
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const nama = /filename="([^"]+)"/.exec(cd)?.[1] ?? "laporan.xlsx";
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nama;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  // Dilepas setelah klik sempat diproses; mencabutnya seketika membatalkan
+  // unduhan di sebagian browser.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
