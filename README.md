@@ -98,13 +98,9 @@ Tiap fitur bisa dimatikan dari halaman pengaturan. Yang dimatikan hilang dari
 navigasi dan endpoint-nya membalas 403, karena menyembunyikan tombol saja
 tidak menutup alamatnya.
 
-<!--
-Tangkapan layar: taruh berkasnya di docs/screenshots/, lalu hapus komentar ini.
-
-| Beranda | Papan dapur | Laporan |
+| Beranda pelanggan | Papan dapur | Laporan |
 |---|---|---|
-| ![](docs/screenshots/beranda.png) | ![](docs/screenshots/dapur.png) | ![](docs/screenshots/laporan.png) |
--->
+| ![Beranda dengan banner promo dan menu terlaris](docs/screenshots/beranda.png) | ![Papan kanban pesanan dapur](docs/screenshots/dapur.png) | ![Laporan dengan grafik omzet harian](docs/screenshots/laporan.png) |
 
 ---
 

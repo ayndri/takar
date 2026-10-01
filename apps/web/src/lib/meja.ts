@@ -56,7 +56,23 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-const getSnapshot = () => snapshot;
+/**
+ * Nilainya diisi di sini, bukan hanya di subscribe().
+ *
+ * React memanggil getSnapshot() lebih dulu, baru subscribe(). Kalau isinya
+ * baru dibaca saat subscribe, render pertama di browser selalu melihat nilai
+ * kosong, dan efek apa pun yang bergantung padanya ikut berjalan dengan
+ * nilai itu. Di halaman dasbor akibatnya nyata: menyegarkan halaman
+ * melemparkan orang ke halaman login padahal tokennya masih ada.
+ */
+const getSnapshot = (): string | null => {
+  if (!loaded) {
+    loaded = true;
+    snapshot = baca();
+  }
+
+  return snapshot;
+};
 const getServerSnapshot = (): string | null => null;
 
 export function useMeja() {
@@ -97,7 +113,14 @@ function subscribeToken(listener: () => void) {
   return () => tokenListeners.delete(listener);
 }
 
-const getTokenSnapshot = () => tokenSnapshot;
+const getTokenSnapshot = (): string | null => {
+  if (!tokenLoaded) {
+    tokenLoaded = true;
+    tokenSnapshot = bacaToken();
+  }
+
+  return tokenSnapshot;
+};
 const getTokenServerSnapshot = (): string | null => null;
 
 /** Token QR meja yang terakhir dipindai dari perangkat ini. */

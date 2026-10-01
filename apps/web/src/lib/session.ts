@@ -11,6 +11,18 @@ import { getSessionUser, getToken, type SessionUser } from "./client-api";
 
 export type Session = { token: string; user: SessionUser | null } | null;
 
+/**
+ * Tiga keadaan, bukan dua.
+ *
+ * `undefined` berarti belum diketahui, `null` berarti memang tidak login.
+ * Membedakan keduanya itu perlu: saat React menghidrasi halaman, ia WAJIB
+ * memakai nilai dari server supaya cocok dengan HTML-nya, dan di server
+ * localStorage tidak ada. Kalau "belum diketahui" dan "tidak login" sama-sama
+ * null, halaman dasbor melempar orang ke login pada render pertama walau
+ * tokennya ada. Gejalanya: menyegarkan halaman dasbor selalu keluar sendiri.
+ */
+export type SesiTerbaca = Session | undefined;
+
 let snapshot: Session = null;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -56,9 +68,34 @@ function subscribe(listener: () => void) {
   };
 }
 
-const getSnapshot = () => snapshot;
-const getServerSnapshot = (): Session => null;
+/**
+ * Nilainya diisi di sini, bukan hanya di subscribe().
+ *
+ * React memanggil getSnapshot() lebih dulu, baru subscribe(). Kalau isinya
+ * baru dibaca saat subscribe, render pertama di browser selalu melihat nilai
+ * kosong, dan efek apa pun yang bergantung padanya ikut berjalan dengan
+ * nilai itu. Di halaman dasbor akibatnya nyata: menyegarkan halaman
+ * melemparkan orang ke halaman login padahal tokennya masih ada.
+ */
+const getSnapshot = (): Session => {
+  if (!loaded) {
+    loaded = true;
+    snapshot = baca();
+  }
 
-export function useSession() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return snapshot;
+};
+/**
+ * Di server localStorage tidak ada, jadi jawabannya bukan "tidak login"
+ * melainkan "belum bisa tahu". Nilai ini juga yang dipakai React saat
+ * menghidrasi, dan itulah inti perbaikannya.
+ */
+const getServerSnapshot = (): SesiTerbaca => undefined;
+
+export function useSession(): SesiTerbaca {
+  return useSyncExternalStore<SesiTerbaca>(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 }

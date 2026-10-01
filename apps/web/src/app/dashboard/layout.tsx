@@ -46,12 +46,15 @@ export default function DashboardLayout({
   const pengaturan = usePengaturan();
 
   useEffect(() => {
-    // Render pertama selalu tanpa sesi (server tidak punya localStorage),
-    // jadi pengalihan baru boleh dilakukan setelah komponen ada di browser.
+    // Hanya null yang berarti benar-benar tidak login. `undefined` berarti
+    // sesinya belum sempat dibaca — dan itu keadaan setiap render pertama,
+    // karena React menghidrasi memakai nilai dari server yang tidak punya
+    // localStorage. Mengalihkan di situ membuat halaman dasbor yang
+    // disegarkan selalu keluar sendiri.
     if (session === null) router.replace("/login");
   }, [session, router]);
 
-  if (!session) {
+  if (session === undefined || session === null) {
     // Render pertama selalu tanpa sesi, jadi layar ini pasti terlihat sekejap
     // oleh semua orang yang membuka dasbor. Rangka header membuat kedipannya
     // tidak terasa seperti halaman yang salah muat.
