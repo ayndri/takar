@@ -124,6 +124,8 @@ model Ingredient {
   wasteLogs     WasteLog[]
   opnameItems   OpnameItem[]
 
+  stockReservations StockReservation[]
+
   @@map("ingredients")
 }
 
@@ -241,8 +243,9 @@ model Order {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items    OrderItem[]
-  payments Payment[]
+  items        OrderItem[]
+  payments     Payment[]
+  reservations StockReservation[]
 
   @@index([status, createdAt])
   @@map("orders")
@@ -388,6 +391,43 @@ model Attachment {
 
   @@index([refType, refId])
   @@map("attachments")
+}
+
+/// Bahan yang sudah "dipesan" oleh pesanan yang belum dikonfirmasi.
+///
+/// Tabel terpisah, BUKAN jenis baru di StockMovement. Ledger harus tetap
+/// berisi pergerakan yang benar-benar terjadi; reservasi belum terjadi, dan
+/// sebagian besar nanti tidak pernah terjadi. Mencampurnya membuat jumlah
+/// ledger tidak lagi sama dengan stok fisik, dan itu satu-satunya hal yang
+/// dijaga mati-matian di seluruh skema ini.
+///
+/// Stok yang boleh dijanjikan ke orang berikutnya = jumlah ledger dikurangi
+/// reservasi yang masih hidup. Yang sudah lewat `expiresAt` tidak lagi
+/// dihitung walau `releasedAt`-nya belum terisi, jadi stok tidak pernah
+/// terkunci selamanya hanya karena penyapunya belum sempat jalan.
+model StockReservation {
+  id String @id @default(uuid())
+
+  orderId String @map("order_id")
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  ingredientId String     @map("ingredient_id")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  /// Selalu positif. Dalam satuan dasar bahan.
+  qty Decimal @db.Decimal(14, 3)
+
+  expiresAt DateTime @map("expires_at")
+
+  /// Terisi saat pesanannya dikonfirmasi (bahannya benar-benar dipotong),
+  /// dibatalkan, atau kedaluwarsa. Kosong berarti masih memegang stok.
+  releasedAt DateTime? @map("released_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ingredientId, releasedAt, expiresAt])
+  @@index([orderId])
+  @@map("stock_reservations")
 }
 
 // ─────────────────────────── inti: ledger ───────────────────────────

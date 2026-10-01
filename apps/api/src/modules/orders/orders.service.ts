@@ -5,7 +5,19 @@ import { badRequest, conflict, insufficientStock, notFound } from '../../lib/err
 import { hargaBerlaku } from '../menus/menu-pricing.js'
 import { reservasiMejaTerdekat } from '../reservations/reservations.sweeper.js'
 import { flagNyala } from '../settings/settings.service.js'
-import { requiredIngredients, type RecipeLine } from '../stock/stock-calculator.js'
+import {
+  findShortages,
+  requiredIngredients,
+  sisaSetelahReservasi,
+  type RecipeLine,
+} from '../stock/stock-calculator.js'
+import {
+  aturanReservasiStok,
+  buatReservasi,
+  lepasReservasi,
+  reservasiAktif,
+  sapuReservasiStok,
+} from '../stock/stock-reservation.service.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
 import { orderEvents } from './orders.events.js'
 import type { CreateOrderInput } from './orders.schema.js'
@@ -87,24 +99,89 @@ export async function createOrder(input: CreateOrderInput) {
     return sum.plus(hargaPakai.get(item.menuId)!.mul(item.qty))
   }, new Decimal(0))
 
-  const order = await prisma.order.create({
-    data: {
-      code: generateCode(),
-      tableId: input.tableId ?? null,
-      customerName: input.customerName ?? null,
-      note: input.note ?? null,
-      paymentMethod: input.paymentMethod,
-      total: total.toFixed(2),
-      items: {
-        create: input.items.map((item) => ({
-          menuId: item.menuId,
-          qty: item.qty,
-          unitPrice: hargaPakai.get(item.menuId)!.toFixed(2),
-          note: item.note ?? null,
-        })),
-      },
+  const reservasiStok = await aturanReservasiStok()
+  await sapuReservasiStok()
+
+  const dataPesanan = {
+    code: generateCode(),
+    tableId: input.tableId ?? null,
+    customerName: input.customerName ?? null,
+    note: input.note ?? null,
+    paymentMethod: input.paymentMethod,
+    total: total.toFixed(2),
+    items: {
+      create: input.items.map((item) => ({
+        menuId: item.menuId,
+        qty: item.qty,
+        unitPrice: hargaPakai.get(item.menuId)!.toFixed(2),
+        note: item.note ?? null,
+      })),
     },
-    include: ORDER_INCLUDE,
+  }
+
+  if (!reservasiStok.nyala) {
+    const order = await prisma.order.create({
+      data: dataPesanan,
+      include: ORDER_INCLUDE,
+    })
+
+    orderEvents.emit('changed', { type: 'created', orderId: order.id })
+    return order
+  }
+
+  /**
+   * Penyisihan bahan, di dalam satu transaksi dengan pembuatan pesanannya.
+   *
+   * Urutannya sama dengan confirmOrder dan dengan alasan yang sama: kunci
+   * baris stoknya dulu, baru baca. Membaca sebelum mengunci membuat dua
+   * pesanan bersamaan sama-sama melihat sisa yang sama lalu sama-sama lolos.
+   *
+   * Bedanya dengan confirmOrder, di sini tidak ada yang dipotong. Yang
+   * dicatat cuma janji bahwa bahan sekian disisihkan untuk pesanan ini
+   * selama beberapa menit ke depan.
+   */
+  const recipesByMenu = new Map<string, RecipeLine[]>(
+    menus.map((m) => [
+      m.id,
+      m.recipes.map((r) => ({ ingredientId: r.ingredientId, qty: r.qty.toString() })),
+    ]),
+  )
+
+  const kebutuhan = requiredIngredients(
+    input.items.map((i) => ({ menuId: i.menuId, qty: i.qty })),
+    recipesByMenu,
+  )
+
+  const order = await prisma.$transaction(async (tx) => {
+    const terkunci = await lockStocks(tx, [...kebutuhan.keys()])
+    const dipesanLain = await reservasiAktif(tx, {
+      ingredientIds: [...kebutuhan.keys()],
+    })
+
+    const tersedia = sisaSetelahReservasi(terkunci, dipesanLain)
+    const kurang = findShortages(kebutuhan, tersedia)
+
+    if (kurang.length > 0) {
+      const nama = await tx.ingredient.findMany({
+        where: { id: { in: kurang.map((k) => k.ingredientId) } },
+        select: { id: true, name: true },
+      })
+      const namaById = new Map(nama.map((n) => [n.id, n.name]))
+
+      throw insufficientStock(
+        kurang.map((k) => ({
+          ingredient: namaById.get(k.ingredientId) ?? k.ingredientId,
+          needed: k.needed.toString(),
+          available: k.available.toString(),
+        })),
+      )
+    }
+
+    const dibuat = await tx.order.create({ data: dataPesanan, include: ORDER_INCLUDE })
+
+    await buatReservasi(tx, dibuat.id, kebutuhan, reservasiStok.menit)
+
+    return dibuat
   })
 
   orderEvents.emit('changed', { type: 'created', orderId: order.id })
@@ -200,6 +277,19 @@ export async function confirmOrder(orderId: string) {
 
     await applyMovements(tx, movements)
 
+    /**
+     * Penyisihannya dilepas setelah bahannya benar-benar dipotong.
+     *
+     * Kalau tidak, bahan yang sama terhitung dua kali: sekali sebagai
+     * pengurangan di ledger, sekali lagi sebagai janji yang masih berdiri.
+     * Stok yang tampil di katalog akan lebih kecil dari kenyataannya.
+     *
+     * Reservasi milik pesanan LAIN sengaja tidak disentuh. Kasir sedang
+     * melayani tamu yang nyata di depannya, dan yang menentukan boleh atau
+     * tidaknya adalah stok fisik, bukan janji ke orang yang belum sampai.
+     */
+    await lepasReservasi(tx, order.id)
+
     return tx.order.update({
       where: { id: order.id },
       data: { status: 'CONFIRMED', confirmedAt: new Date() },
@@ -245,6 +335,10 @@ export async function cancelOrder(orderId: string, reason?: string) {
         })),
       )
     }
+
+    // Pesanan yang batal melepaskan bahan yang sempat disisihkan untuknya,
+    // baik sudah dikonfirmasi maupun belum.
+    await lepasReservasi(tx, order.id)
 
     return tx.order.update({
       where: { id: order.id },

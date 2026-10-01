@@ -273,6 +273,7 @@ async function main() {
   await prisma.ingredientStock.deleteMany()
   await prisma.purchaseUnit.deleteMany()
   await prisma.ingredient.deleteMany()
+  await prisma.stockReservation.deleteMany()
   await prisma.announcement.deleteMany()
   await prisma.reservation.deleteMany()
   await prisma.cafeTable.deleteMany()

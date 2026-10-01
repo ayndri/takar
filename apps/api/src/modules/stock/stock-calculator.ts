@@ -207,3 +207,36 @@ export function opnameDiff(systemQty: DecimalLike, physicalQty: DecimalLike): De
 export function opnameValue(diff: DecimalLike, avgCost: DecimalLike): Decimal {
   return d(diff).mul(d(avgCost))
 }
+
+// ─────────────────── stok yang masih boleh dijanjikan ───────────────────
+
+/**
+ * Stok dikurangi bahan yang sudah dipesan pesanan lain tapi belum dipotong.
+ *
+ * Angka inilah yang boleh dijanjikan ke orang berikutnya. Memakai jumlah
+ * ledger apa adanya berarti menjanjikan bahan yang sebenarnya sudah
+ * disisihkan untuk pesanan yang menunggu di antrean kasir.
+ *
+ * Hasilnya boleh nol, tidak boleh negatif: reservasi yang entah bagaimana
+ * melebihi stok tetap berarti "tidak ada yang tersisa", bukan "minus tiga".
+ */
+export function sisaSetelahReservasi(
+  stok: Map<string, Decimal>,
+  reservasi: Map<string, Decimal>,
+): Map<string, Decimal> {
+  const sisa = new Map<string, Decimal>()
+
+  for (const [ingredientId, qty] of stok) {
+    const dipesan = reservasi.get(ingredientId) ?? new Decimal(0)
+    const hasil = qty.minus(dipesan)
+    sisa.set(ingredientId, hasil.lt(0) ? new Decimal(0) : hasil)
+  }
+
+  // Bahan yang punya reservasi tapi tidak ada baris stoknya sama sekali
+  // tetap harus muncul sebagai nol, bukan hilang dari peta.
+  for (const ingredientId of reservasi.keys()) {
+    if (!sisa.has(ingredientId)) sisa.set(ingredientId, new Decimal(0))
+  }
+
+  return sisa
+}

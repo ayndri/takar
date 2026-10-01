@@ -153,6 +153,27 @@ export const SETTINGS: readonly SettingDef[] = [
     publik: true,
   },
   {
+    kunci: 'toko.reservasiStok',
+    grup: 'toko',
+    tipe: 'boolean',
+    bawaan: 'true',
+    label: 'Sisihkan bahan saat pesanan masuk',
+    keterangan:
+      'Bahan untuk pesanan yang menunggu konfirmasi disisihkan sementara, jadi pesanan berikutnya tidak bisa menghabiskannya. Dimatikan berarti bahan baru dipotong saat kasir konfirmasi, dan pesanan yang terlanjur diterima bisa ditolak belakangan.',
+  },
+  {
+    kunci: 'toko.reservasiStokMenit',
+    grup: 'toko',
+    tipe: 'angka',
+    bawaan: '20',
+    min: 5,
+    maks: 180,
+    label: 'Lama bahan disisihkan (menit)',
+    keterangan:
+      'Setelah selewat ini tanpa dikonfirmasi, bahannya kembali bisa dipakai pesanan lain. Pesanannya sendiri tidak dibatalkan; kasir masih bisa mengonfirmasinya kalau stoknya memang masih ada.',
+    butuh: 'toko.reservasiStok',
+  },
+  {
     kunci: 'toko.sembunyikanMenuHabis',
     grup: 'toko',
     tipe: 'boolean',

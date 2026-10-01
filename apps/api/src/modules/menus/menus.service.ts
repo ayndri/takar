@@ -1,7 +1,27 @@
 import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest, notFound } from '../../lib/errors.js'
-import { maxPortions, menuCost, menuMargin, type RecipeLine } from '../stock/stock-calculator.js'
+import {
+  maxPortions,
+  menuCost,
+  menuMargin,
+  sisaSetelahReservasi,
+  type RecipeLine,
+} from '../stock/stock-calculator.js'
+import { reservasiAktif } from '../stock/stock-reservation.service.js'
+
+/**
+ * Stok yang boleh dijanjikan ke pelanggan berikutnya.
+ *
+ * Bukan jumlah ledger apa adanya: bahan yang sudah disisihkan untuk pesanan
+ * yang menunggu di antrean kasir tidak boleh ikut ditawarkan. Kalau ikut,
+ * kartu menu menjanjikan "tersisa 3 porsi" untuk bahan yang sebenarnya sudah
+ * ada yang memesan.
+ */
+async function stokBolehDijanjikan() {
+  const [stok, dipesan] = await Promise.all([getStockMap(), reservasiAktif()])
+  return sisaSetelahReservasi(stok, dipesan)
+}
 import { getAvgCostMap, getStockMap } from '../stock/stock.service.js'
 import { flagNyala } from '../settings/settings.service.js'
 import {
@@ -136,7 +156,7 @@ export async function listPublicMenus(params: ListMenuParams = {}) {
         ? {}
         : { skip: (halaman - 1) * pageSize, take: pageSize }),
     }),
-    getStockMap(),
+    stokBolehDijanjikan(),
     // Dipakai untuk menandai menu terlaris. Hanya pesanan yang benar-benar
     // dikonfirmasi yang dihitung, jadi angkanya tidak bisa dinaikkan dengan
     // mengirim pesanan lalu membatalkannya.
@@ -245,7 +265,7 @@ export async function getHighlights() {
       where: { isActive: true },
       include: { recipes: { select: { ingredientId: true, qty: true } } },
     }),
-    getStockMap(),
+    stokBolehDijanjikan(),
     prisma.orderItem.groupBy({
       by: ['menuId'],
       _sum: { qty: true },
@@ -403,7 +423,7 @@ export async function getMenu(id: string) {
 
   if (!menu) throw notFound('Menu tidak ditemukan')
 
-  const stock = await getStockMap()
+  const stock = await stokBolehDijanjikan()
   const promoNyala = await flagNyala('modul.promo')
   const recipe: RecipeLine[] = menu.recipes.map((r) => ({
     ingredientId: r.ingredientId,

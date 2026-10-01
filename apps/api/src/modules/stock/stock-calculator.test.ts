@@ -8,6 +8,7 @@ import {
   opnameDiff,
   opnameValue,
   requiredIngredients,
+  sisaSetelahReservasi,
   toBaseQty,
   unitCostPerBase,
   weightedAverageCost,
@@ -272,5 +273,49 @@ describe('presisi Decimal', () => {
     }
 
     expect(total.toString()).toBe('3')
+  })
+})
+
+describe('sisaSetelahReservasi', () => {
+  const peta = (isi: Record<string, number>) =>
+    new Map(Object.entries(isi).map(([k, v]) => [k, new Decimal(v)]))
+
+  const angka = (m: Map<string, Decimal>) =>
+    Object.fromEntries([...m].map(([k, v]) => [k, v.toNumber()]))
+
+  it('mengurangi stok dengan yang sudah dipesan', () => {
+    const sisa = sisaSetelahReservasi(
+      peta({ susu: 1000, kopi: 500 }),
+      peta({ susu: 300 }),
+    )
+    expect(angka(sisa)).toEqual({ susu: 700, kopi: 500 })
+  })
+
+  it('tidak pernah menghasilkan angka negatif', () => {
+    // Reservasi yang melebihi stok berarti "tidak ada yang tersisa",
+    // bukan "minus tiga" — dan angka minus akan bocor ke kartu menu.
+    const sisa = sisaSetelahReservasi(peta({ susu: 100 }), peta({ susu: 250 }))
+    expect(angka(sisa)).toEqual({ susu: 0 })
+  })
+
+  it('bahan tanpa reservasi tidak berubah', () => {
+    const sisa = sisaSetelahReservasi(peta({ gula: 800 }), peta({}))
+    expect(angka(sisa)).toEqual({ gula: 800 })
+  })
+
+  it('bahan yang punya reservasi tapi tidak punya baris stok jadi nol', () => {
+    const sisa = sisaSetelahReservasi(peta({}), peta({ sirup: 50 }))
+    expect(angka(sisa)).toEqual({ sirup: 0 })
+  })
+
+  it('tidak mengubah peta aslinya', () => {
+    const stok = peta({ susu: 1000 })
+    sisaSetelahReservasi(stok, peta({ susu: 400 }))
+    expect(stok.get('susu')!.toNumber()).toBe(1000)
+  })
+
+  it('menjaga ketelitian pecahan', () => {
+    const sisa = sisaSetelahReservasi(peta({ susu: 18.5 }), peta({ susu: 0.3 }))
+    expect(sisa.get('susu')!.toString()).toBe('18.2')
   })
 })
