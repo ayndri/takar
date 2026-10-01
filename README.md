@@ -70,8 +70,13 @@ tidak dianggap gagal. Uangnya memang sudah ada. Statusnya jadi
 ada orang yang harus diuruskan uangnya.
 
 Midtrans mengirim ulang notifikasi kalau server lambat menjawab, jadi
-penerapannya dijaga dua lapis. Saya kirim notifikasi yang sama dua kali: stok
-terpotong sekali.
+penerapannya dijaga dua lapis.
+
+Tes integrasi untuk bagian ini menemukan bug yang lolos dari pengujian
+manual: dua notifikasi yang dikirim berurutan memang aman, tapi dua yang
+benar-benar bersamaan memotong stok dua kali. Penyebabnya status pesanan
+dibaca sebelum barisnya dikunci, jadi keduanya melihat PENDING. Sekarang
+baris pesanannya ikut dikunci, bukan cuma baris stoknya.
 
 ---
 
@@ -113,7 +118,7 @@ Tangkapan layar: taruh berkasnya di docs/screenshots/, lalu hapus komentar ini.
 | Auth | JWT sendiri (`jsonwebtoken` + `bcryptjs`) |
 | Realtime | SSE untuk papan dapur |
 | Pembayaran | Midtrans Snap (sandbox) |
-| Test | Vitest, 114 unit test |
+| Test | Vitest: 114 unit test, 22 tes integrasi terhadap Postgres sungguhan |
 
 Monorepo npm workspaces: `apps/api` dan `apps/web`. 21 tabel, 6 migrasi.
 
@@ -174,10 +179,26 @@ ledger.
 Pembayaran online mati sampai kunci Midtrans diisi. Sisanya tetap jalan.
 
 ```bash
-npm run test                             # 114 unit test
+npm run test                             # 114 unit test, tanpa database
 npx tsc --noEmit -p apps/api/tsconfig.json
 npm run lint
 ```
+
+Tes integrasi butuh Postgres yang hidup dan dijalankan terpisah, karena ia
+mengosongkan seluruh tabel sebelum tiap berkas:
+
+```bash
+docker compose up -d
+
+export DATABASE_URL_TEST=postgresql://takar:takar@localhost:5432/takar_test
+DATABASE_URL=$DATABASE_URL_TEST DIRECT_URL=$DATABASE_URL_TEST   npm run db:migrate:test --workspace=apps/api
+
+npm run test:int                         # 22 tes
+```
+
+Alamatnya dibaca dari `DATABASE_URL_TEST`, bukan `DATABASE_URL`, dan ditolak
+kalau tidak terlihat seperti database uji. Satu salah ketik tidak boleh cukup
+untuk mengosongkan database yang sedang dipakai.
 
 ---
 
@@ -198,6 +219,7 @@ apps/api/src/
   modules/menus/menu-pricing.ts            harga promo, 22 test
   lib/phone.ts                             nomor HP ke bentuk wa.me, 11 test
   middleware/feature.ts                    penolak 403 untuk modul yang mati
+  test/fixtures.ts                         kafe kecil & pengosong db untuk tes integrasi
 
 apps/web/src/
   app/(toko)/                              halaman pelanggan
@@ -212,9 +234,6 @@ diuji 114 kali, tanpa perlu menyiapkan apa pun.
 ---
 
 ## Yang belum ada
-
-Integration test yang benar-benar menyentuh database. Unit test sudah banyak,
-yang ini belum.
 
 Multi-outlet. Skemanya sudah punya `TRANSFER_IN` dan `TRANSFER_OUT`, alurnya
 belum.

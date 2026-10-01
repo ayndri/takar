@@ -22,6 +22,30 @@ import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.s
 import { orderEvents } from './orders.events.js'
 import type { CreateOrderInput } from './orders.schema.js'
 
+/** Prisma dalam transaksi punya tipe yang sedikit berbeda dari client biasa. */
+type Db = typeof prisma | Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+/**
+ * Kunci baris pesanannya sendiri sebelum statusnya dibaca.
+ *
+ * Tanpa ini, dua permintaan yang mengonfirmasi pesanan yang SAMA pada detik
+ * yang sama sama-sama membaca status PENDING sebelum salah satunya sempat
+ * menyimpan. Keduanya lalu lolos pemeriksaan status, antre di kunci stok,
+ * dan memotong bahan dua kali untuk satu pesanan.
+ *
+ * Kunci stok saja tidak cukup: yang diperebutkan di sini bukan bahannya,
+ * melainkan hak untuk mengubah pesanan ini. Midtrans mengirim ulang
+ * notifikasi kalau server lambat menjawab, jadi dua permintaan bersamaan
+ * untuk satu pesanan bukan kemungkinan teoretis.
+ */
+async function lockOrder(tx: Db, orderId: string) {
+  // Cast ke text: Prisma memetakan `String @id` ke kolom text.
+  await tx.$queryRawUnsafe(
+    `select id from orders where id = $1::text for update`,
+    orderId,
+  )
+}
+
 /** Kode pendek yang gampang dibaca pelanggan di struk: TKR-7F2A. */
 function generateCode() {
   return `TKR-${randomBytes(2).toString('hex').toUpperCase()}`
@@ -203,6 +227,8 @@ export async function createOrder(input: CreateOrderInput) {
  */
 export async function confirmOrder(orderId: string) {
   const result = await prisma.$transaction(async (tx) => {
+    await lockOrder(tx, orderId)
+
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { items: true },
@@ -311,6 +337,10 @@ export async function confirmOrder(orderId: string) {
  */
 export async function cancelOrder(orderId: string, reason?: string) {
   const result = await prisma.$transaction(async (tx) => {
+    // Alasan yang sama seperti di confirmOrder: dua pembatalan bersamaan
+    // akan sama-sama menulis pergerakan RETURN dan menggelembungkan stok.
+    await lockOrder(tx, orderId)
+
     const order = await tx.order.findUnique({ where: { id: orderId } })
 
     if (!order) throw notFound('Pesanan tidak ditemukan')

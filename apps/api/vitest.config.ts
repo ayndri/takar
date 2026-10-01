@@ -10,5 +10,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
+
+    // Tes integrasi punya confignya sendiri: ia butuh Postgres yang hidup dan
+    // mengosongkan seluruh tabel. Tanpa dikecualikan di sini, `npm run test`
+    // ikut memungutnya dan gagal di mesin yang tidak menyiapkan database.
+    exclude: ['**/node_modules/**', '**/dist/**', 'src/**/*.int.test.ts'],
   },
 })

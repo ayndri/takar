@@ -44,3 +44,6 @@ ROADMAP.md
 LANJUTKAN-DI-SINI.md
 catatan/
 *.local.md
+
+# Alamat database uji (lokal, tidak ikut ke repo)
+.env.test

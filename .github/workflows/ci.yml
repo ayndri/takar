@@ -10,11 +10,27 @@ jobs:
     name: API — typecheck & test
     runs-on: ubuntu-latest
 
+    # Postgres sungguhan, bukan boneka. Tes integrasi memeriksa penguncian
+    # baris, dan itu perilaku database — tidak ada cara memalsukannya.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: takar
+          POSTGRES_PASSWORD: takar
+          POSTGRES_DB: takar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U takar -d takar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      # Nilai boneka: job ini tidak menyentuh database sungguhan.
-      # Prisma CLI tetap butuh connection string untuk memuat prisma.config.ts.
-      DATABASE_URL: postgresql://takar:takar@localhost:5432/takar
-      DIRECT_URL: postgresql://takar:takar@localhost:5432/takar
+      DATABASE_URL: postgresql://takar:takar@localhost:5432/takar_test
+      DIRECT_URL: postgresql://takar:takar@localhost:5432/takar_test
+      DATABASE_URL_TEST: postgresql://takar:takar@localhost:5432/takar_test
       JWT_SECRET: rahasia-ci-yang-panjangnya-lebih-dari-32-karakter
 
     steps:
@@ -33,8 +49,14 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit -p apps/api/tsconfig.json
 
-      - name: Test
+      - name: Test unit
         run: npm run test --workspace=apps/api
+
+      - name: Siapkan skema database uji
+        run: npm run db:migrate:test --workspace=apps/api
+
+      - name: Test integrasi
+        run: npm run test:int --workspace=apps/api
 
   web:
     name: Web — lint & build
