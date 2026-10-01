@@ -16,6 +16,43 @@ import { lupakanCacheSettings } from '../modules/settings/settings.service.js'
  */
 
 /**
+ * Tolak kalau yang tersambung bukan database uji.
+ *
+ * Ditanyakan ke databasenya sendiri lewat `current_database()`, bukan dibaca
+ * dari variabel lingkungan. Alasannya mahal dipelajari: penjaga versi
+ * pertama memeriksa DATABASE_URL di berkas setup, dan berkas setup itu hanya
+ * dimuat oleh konfigurasi tes integrasi. Saat berkas `.int.test.ts` tidak
+ * sengaja ikut terpungut oleh `npm run test`, konfigurasi unit memuatnya
+ * tanpa setup dan tanpa env, dotenv mengisi DATABASE_URL dari `.env`, dan
+ * seluruh tabel di database yang sedang dipakai terhapus.
+ *
+ * Pelajarannya: penjaga harus menempel pada perbuatan yang berbahaya, bukan
+ * pada jalur yang kebetulan biasa dilewati. Ditaruh di sini, ia ikut ke mana
+ * pun fungsi ini dipanggil.
+ */
+async function pastikanDatabaseUji() {
+  const baris = await prisma.$queryRaw<{ db: string }[]>`
+    select current_database() as db
+  `
+
+  const db = baris[0]?.db ?? '(tidak diketahui)'
+
+  if (!/test/i.test(db)) {
+    throw new Error(
+      [
+        `MENOLAK mengosongkan database "${db}".`,
+        '',
+        'Nama databasenya harus mengandung "test". Yang ini tidak, jadi besar',
+        'kemungkinan ia sedang dipakai untuk hal lain.',
+        '',
+        'Jalankan tes integrasi dengan DATABASE_URL_TEST yang menunjuk ke',
+        'database uji tersendiri: npm run test:int',
+      ].join('\n'),
+    )
+  }
+}
+
+/**
  * Kosongkan semua tabel.
  *
  * Satu perintah TRUNCATE untuk semuanya, dengan CASCADE supaya urutan foreign
@@ -27,6 +64,8 @@ import { lupakanCacheSettings } from '../modules/settings/settings.service.js'
  * diam-diam mewarisi data dari tes sebelumnya.
  */
 export async function kosongkanDatabase() {
+  await pastikanDatabaseUji()
+
   const tabel = await prisma.$queryRaw<{ tablename: string }[]>`
     select tablename
       from pg_tables
