@@ -13,6 +13,7 @@ import {
   tanggalLokal,
   type MejaKandidat,
 } from './reservation-calculator.js'
+import { sapuReservasi } from './reservations.sweeper.js'
 import type {
   AvailabilityInput,
   CreateReservationInput,
@@ -239,6 +240,10 @@ export async function createReservation(input: CreateReservationInput) {
  * "tersisa 3 porsi" tapi yang menentukan tetap confirmOrder().
  */
 export async function availability(input: AvailabilityInput) {
+  // Disapu dulu supaya jam yang diblokir permintaan basi tidak ikut terlihat
+  // penuh. Penyapunya sendiri punya jeda, jadi aman dipanggil sesering ini.
+  await sapuReservasi()
+
   const aturan = await aturanReservasi()
 
   const slot = slotHarian({
@@ -323,6 +328,8 @@ export async function getReservationByCode(code: string) {
 }
 
 export async function listReservations(params: ListReservationsInput) {
+  await sapuReservasi()
+
   // Saringan tanggal dibatasi pada hari kafe, bukan hari UTC: reservasi jam
   // 8 malam WIB masih tanggal itu buat kafe, tapi di UTC sudah siang hari
   // yang sama — dan jam 1 pagi WIB di UTC masih tanggal kemarin.
@@ -463,4 +470,45 @@ export async function assignTable(id: string, tableId: string) {
 
     return rapikan(reservation)
   })
+}
+
+/**
+ * Pembatalan oleh tamu sendiri, lewat kode reservasinya.
+ *
+ * Tanpa login, dan itu disengaja: yang memesan memang bukan pengguna
+ * terdaftar, dan kode reservasinya sudah berfungsi sebagai kunci — sama
+ * seperti kode pesanan.
+ *
+ * Yang bisa dibatalkan cuma miliknya sendiri yang belum dimulai. Reservasi
+ * yang tamunya sudah duduk bukan lagi urusan yang bisa diselesaikan dari
+ * ponsel, dan yang sudah lewat jamnya tidak ada gunanya dibatalkan.
+ */
+export async function batalkanOlehTamu(code: string) {
+  const reservation = await prisma.reservation.findUnique({
+    where: { code: code.toUpperCase() },
+  })
+
+  if (!reservation) throw notFound('Reservasi tidak ditemukan')
+
+  if (reservation.status !== 'PENDING' && reservation.status !== 'CONFIRMED') {
+    throw conflict('Reservasi ini sudah tidak bisa dibatalkan')
+  }
+
+  if (reservation.startAt <= new Date()) {
+    throw conflict(
+      'Jam reservasinya sudah lewat. Hubungi kafe kalau perlu diselesaikan.',
+    )
+  }
+
+  const hasil = await prisma.reservation.update({
+    where: { id: reservation.id },
+    data: {
+      status: 'CANCELLED',
+      cancelledAt: new Date(),
+      cancelReason: 'Dibatalkan oleh tamu',
+    },
+    include: RESERVATION_INCLUDE,
+  })
+
+  return rapikan(hasil)
 }

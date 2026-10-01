@@ -3,6 +3,7 @@ import { Decimal } from 'decimal.js'
 import { prisma } from '../../lib/prisma.js'
 import { badRequest, conflict, insufficientStock, notFound } from '../../lib/errors.js'
 import { hargaBerlaku } from '../menus/menu-pricing.js'
+import { reservasiMejaTerdekat } from '../reservations/reservations.sweeper.js'
 import { flagNyala } from '../settings/settings.service.js'
 import { requiredIngredients, type RecipeLine } from '../stock/stock-calculator.js'
 import { applyMovements, lockStocks, type MovementInput } from '../stock/stock.service.js'
@@ -303,10 +304,34 @@ export async function getOrderByCode(code: string) {
 }
 
 export async function listOrders(params: { status?: string; limit: number }) {
-  return prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where: params.status ? { status: params.status as never } : undefined,
     include: ORDER_INCLUDE,
     orderBy: { createdAt: 'desc' },
     take: params.limit,
+  })
+
+  /**
+   * Tandai pesanan yang mejanya sudah dipesan orang lain sebentar lagi.
+   *
+   * Satu query untuk semua meja sekaligus, bukan satu per pesanan. Papan
+   * kasir memuat puluhan pesanan dan sebagian besar berbagi meja yang sama.
+   */
+  const tableIds = [...new Set(orders.map((o) => o.tableId).filter(Boolean))] as string[]
+  const reservasi = await reservasiMejaTerdekat(tableIds)
+
+  return orders.map((o) => {
+    const r = o.tableId ? reservasi.get(o.tableId) : undefined
+
+    return {
+      ...o,
+      /**
+       * Null untuk hampir semua pesanan. Yang terisi berarti baristanya perlu
+       * tahu: tamu ini duduk di meja yang sudah dijanjikan ke orang lain.
+       */
+      tableReservation: r
+        ? { startAt: r.startAt, customerName: r.customerName, guestCount: r.guestCount }
+        : null,
+    }
   })
 }

@@ -11,6 +11,7 @@ import {
 import {
   assignTable,
   availability,
+  batalkanOlehTamu,
   createReservation,
   getReservationByCode,
   listReservations,
@@ -44,6 +45,20 @@ publicReservationsRouter.post(
   validateBody(createReservationSchema),
   async (req, res) => {
     res.status(201).json(await createReservation(req.body))
+  },
+)
+
+/**
+ * Pembatalan oleh tamu sendiri.
+ *
+ * Diletakkan sebelum rute `/:code` supaya "batal" di ujung alamat tidak
+ * tertangkap sebagai kode reservasi.
+ */
+publicReservationsRouter.post(
+  '/:code/batal',
+  validateParams(codeParamSchema),
+  async (_req, res) => {
+    res.json(await batalkanOlehTamu(getParams<{ code: string }>(res).code))
   },
 )
 

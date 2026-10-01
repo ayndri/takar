@@ -20,6 +20,12 @@ type Order = {
   total: string;
   createdAt: string;
   table: { number: string } | null;
+  /** Terisi kalau meja pesanan ini sudah dijanjikan ke tamu lain sebentar lagi. */
+  tableReservation: {
+    startAt: string;
+    customerName: string;
+    guestCount: number;
+  } | null;
   paymentMethod: "CASHIER" | "ONLINE";
   payments: {
     status:
@@ -373,6 +379,17 @@ export default function PesananPage() {
                       </span>
 
                       <LabelBayar order={order} />
+
+                      {order.tableReservation && (
+                        <span className="mt-1 block rounded-lg bg-warning/15 px-2 py-1 text-xs text-warning">
+                          Meja {order.table?.number} dipesan{" "}
+                          {new Intl.DateTimeFormat("id-ID", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(order.tableReservation.startAt))}{" "}
+                          a.n. {order.tableReservation.customerName}
+                        </span>
+                      )}
                       <span className="block text-xs text-muted">
                         {formatWaktu(order.createdAt)}
                       </span>

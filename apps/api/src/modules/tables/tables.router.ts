@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma.js'
 import { conflict, notFound } from '../../lib/errors.js'
 import { requireAuth, requireRole } from '../../middleware/auth.js'
+import { reservasiMejaTerdekat } from '../reservations/reservations.sweeper.js'
 import { getParams, validateBody, validateParams } from '../../middleware/validate.js'
 
 /** Token cukup panjang supaya tidak bisa ditebak dengan mencoba-coba. */
@@ -62,7 +63,27 @@ tablesRouter.get(
 
     if (!table?.isActive) throw notFound('Meja tidak ditemukan')
 
-    res.json({ id: table.id, number: table.number })
+    /**
+     * Kabar kalau meja ini sudah dipesan orang lain sebentar lagi.
+     *
+     * Peringatan, bukan larangan: tamu tetap boleh memesan. Yang kurang
+     * selama ini bukan kemampuan sistem melarang, tapi kemampuan orang untuk
+     * tahu — dan yang paling dirugikan kalau tidak diberi tahu justru tamu
+     * yang sudah repot memesan meja jauh-jauh hari.
+     */
+    const reservasi = (await reservasiMejaTerdekat([table.id])).get(table.id)
+
+    res.json({
+      id: table.id,
+      number: table.number,
+      reservasi: reservasi
+        ? {
+            startAt: reservasi.startAt,
+            customerName: reservasi.customerName,
+            guestCount: reservasi.guestCount,
+          }
+        : null,
+    })
   },
 )
 

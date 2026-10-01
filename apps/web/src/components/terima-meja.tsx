@@ -7,7 +7,21 @@ import { IconMeja } from "@/components/icons";
 import { simpanTokenMeja, useMeja } from "@/lib/meja";
 import { useApi } from "@/lib/use-api";
 
-type Meja = { id: string; number: string };
+type Meja = {
+  id: string;
+  number: string;
+  reservasi: {
+    startAt: string;
+    customerName: string;
+    guestCount: number;
+  } | null;
+};
+
+const jamSaja = (iso: string) =>
+  new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
 
 /**
  * Menukar token QR jadi nomor meja, lalu pindah ke daftar menu.
@@ -35,7 +49,10 @@ export function TerimaMeja({ token }: { token: string }) {
     // bukti bahwa perangkat ini pernah berada di meja tersebut, dan halaman
     // lacak memakainya untuk menampilkan pesanan meja ini tanpa scan ulang.
     simpanTokenMeja(token);
-    router.replace("/menu?meja=terpasang");
+
+    // Kalau meja ini sudah dipesan orang lain sebentar lagi, jangan langsung
+    // dilempar ke daftar menu — peringatannya tidak akan sempat terbaca.
+    if (!data.reservasi) router.replace("/menu?meja=terpasang");
   }, [data, meja, router, token]);
 
   if (error) {
@@ -70,9 +87,36 @@ export function TerimaMeja({ token }: { token: string }) {
           <p className="font-display text-3xl font-semibold">
             Meja {data.number}
           </p>
-          <p className="mt-2 text-sm text-muted">
-            Nomor ini sudah terpasang di pesanan kamu. Membuka daftar menu…
-          </p>
+
+          {data.reservasi ? (
+            <>
+              {/* Peringatan, bukan larangan. Tamu tetap boleh memesan —
+                  yang memutuskan tetap barista yang melihat ruangannya. */}
+              <div className="mt-4 rounded-xl border border-warning/40 bg-warning/10 p-4 text-left">
+                <p className="text-sm font-medium text-warning">
+                  Meja ini sudah dipesan untuk pukul{" "}
+                  {jamSaja(data.reservasi.startAt)}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Atas nama {data.reservasi.customerName},{" "}
+                  {data.reservasi.guestCount} orang. Kamu tetap bisa memesan
+                  dari sini, tapi mungkin diminta pindah saat mereka datang —
+                  tanyakan dulu ke barista kalau ragu.
+                </p>
+              </div>
+
+              <Link
+                href="/menu?meja=terpasang"
+                className="mt-4 inline-block rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent-ink"
+              >
+                Mengerti, buka daftar menu
+              </Link>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">
+              Nomor ini sudah terpasang di pesanan kamu. Membuka daftar menu…
+            </p>
+          )}
         </>
       )}
     </div>

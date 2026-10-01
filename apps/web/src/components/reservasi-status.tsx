@@ -1,6 +1,7 @@
 "use client";
 
-import { formatWaktu } from "@/lib/client-api";
+import { useState } from "react";
+import { ApiError, formatWaktu, request } from "@/lib/client-api";
 import { useApi } from "@/lib/use-api";
 import { usePengaturanPublik } from "@/lib/use-settings";
 import { pesanTamuKeKafe, tautanWhatsapp } from "@/lib/whatsapp";
@@ -51,12 +52,46 @@ const tanggalPanjang = (iso: string) =>
 
 export function ReservasiStatus({ code }: { code: string }) {
   const pengaturan = usePengaturanPublik();
+  const [membatalkan, setMembatalkan] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
   // Tamu cuma memantau satu reservasi, dan kafe tidak mengonfirmasi dalam
   // hitungan detik. Setengah menit sekali sudah lebih dari cukup.
-  const { data: reservasi, error } = useApi<Reservasi>(
-    `/api/reservations/${code}`,
-    { refreshInterval: 30000 },
-  );
+  const {
+    data: reservasi,
+    error,
+    mutate,
+  } = useApi<Reservasi>(`/api/reservations/${code}`, {
+    refreshInterval: 30000,
+  });
+
+  /**
+   * Pembatalan oleh tamu sendiri.
+   *
+   * Sebelumnya satu-satunya jalan keluar adalah menghubungi kafe lewat
+   * WhatsApp — dan tamu yang malas menelepon lebih memilih tidak datang sama
+   * sekali. Yang rugi kafenya: mejanya menganggur tanpa ada yang tahu.
+   */
+  async function batalkan() {
+    if (
+      !window.confirm(
+        "Batalkan reservasi ini? Mejanya akan dilepas untuk tamu lain dan tidak bisa dikembalikan.",
+      )
+    ) {
+      return;
+    }
+
+    setMembatalkan(true);
+    setGalat(null);
+
+    try {
+      await request(`/api/reservations/${code}/batal`, { method: "POST" });
+      await mutate();
+    } catch (e) {
+      setGalat(e instanceof ApiError ? e.message : "Gagal membatalkan reservasi");
+    } finally {
+      setMembatalkan(false);
+    }
+  }
 
   if (error) {
     return (
@@ -73,6 +108,15 @@ export function ReservasiStatus({ code }: { code: string }) {
 
   // Kosong berarti pemilik belum mengisi nomor WhatsApp kafe di pengaturan.
   const nomorKafe = pengaturan.teks("toko.nomorWhatsapp", "");
+
+  /**
+   * Yang bisa dibatalkan cuma miliknya sendiri yang belum dimulai. Reservasi
+   * yang tamunya sudah duduk bukan lagi urusan yang bisa diselesaikan dari
+   * ponsel.
+   */
+  const bisaDibatalkan =
+    (reservasi.status === "PENDING" || reservasi.status === "CONFIRMED") &&
+    new Date(reservasi.startAt) > new Date();
 
   const indeks = TAHAPAN.findIndex((t) => t.status === reservasi.status);
   const gagal =
@@ -157,8 +201,24 @@ export function ReservasiStatus({ code }: { code: string }) {
         </ol>
       )}
 
-      {/* Tamu belum punya tombol batal sendiri, jadi ini jalan keluarnya
-          kalau dia berhalangan — sekaligus supaya mejanya bisa dilepas. */}
+      {bisaDibatalkan && (
+        <div className="mt-5">
+          {galat && <p className="mb-2 text-sm text-danger">{galat}</p>}
+          <button
+            type="button"
+            onClick={batalkan}
+            disabled={membatalkan}
+            className="w-full rounded-xl border border-border px-4 py-3 text-sm font-medium text-danger hover:border-danger disabled:opacity-50"
+          >
+            {membatalkan ? "Membatalkan…" : "Batalkan reservasi"}
+          </button>
+          <p className="mt-1.5 text-center text-xs text-muted">
+            Berhalangan datang? Membatalkan lebih baik daripada tidak muncul —
+            mejanya bisa dipakai tamu lain.
+          </p>
+        </div>
+      )}
+
       {nomorKafe && (
         <a
           href={tautanWhatsapp(nomorKafe, pesanTamuKeKafe(reservasi))}

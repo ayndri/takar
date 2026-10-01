@@ -221,6 +221,43 @@ export const SETTINGS: readonly SettingDef[] = [
     publik: true,
   },
   {
+    kunci: 'reservasi.jedaWalkInMenit',
+    grup: 'reservasi',
+    tipe: 'angka',
+    bawaan: '30',
+    min: 0,
+    maks: 240,
+    label: 'Meja dilindungi sebelum reservasi (menit)',
+    keterangan:
+      'Berapa lama sebelum jam reservasi meja mulai diperingatkan. Tamu yang memindai QR di meja itu diberi tahu, dan pesanannya ditandai di papan kasir. Diisi 0 berarti peringatannya mati.',
+    butuh: 'modul.reservasi',
+    publik: true,
+  },
+  {
+    kunci: 'reservasi.batasKonfirmasiMenit',
+    grup: 'reservasi',
+    tipe: 'angka',
+    bawaan: '120',
+    min: 15,
+    maks: 1440,
+    label: 'Batas konfirmasi sebelum jam mulai (menit)',
+    keterangan:
+      'Permintaan yang belum dikonfirmasi sampai sedekat ini dengan jam mulainya otomatis gugur, dan mejanya kembali bisa dipesan. Tanpa batas ini, satu permintaan yang tidak pernah disentuh memblokir mejanya sampai jamnya lewat.',
+    butuh: 'modul.reservasi',
+  },
+  {
+    kunci: 'reservasi.toleransiNoShowMenit',
+    grup: 'reservasi',
+    tipe: 'angka',
+    bawaan: '30',
+    min: 5,
+    maks: 240,
+    label: 'Tunggu tamu datang (menit)',
+    keterangan:
+      'Reservasi yang sudah dikonfirmasi tapi tamunya belum ditandai datang sampai selewat ini dari jam mulai otomatis jadi "tidak datang", dan mejanya dilepas.',
+    butuh: 'modul.reservasi',
+  },
+  {
     kunci: 'reservasi.maksHariKeDepan',
     grup: 'reservasi',
     tipe: 'angka',
